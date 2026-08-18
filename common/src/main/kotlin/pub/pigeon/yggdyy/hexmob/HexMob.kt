@@ -18,9 +18,8 @@ object HexMob {
     fun init() {
         if(LOGGER.isDebugEnabled) LOGGER.warn("Common Init")
         HexMobServerConfig.init()
-        initRegistries(
-            HexMobActions
-        )
+        // Hex actions are registered per-platform in each platform's entrypoint
+        // (the common @ExpectPlatform path was not being transformed at runtime).
         HexMobItems.init()
         HexMobBlocks.init()
         HexMobEntities.init()
