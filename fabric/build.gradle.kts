@@ -83,6 +83,10 @@ dependencies {
     // we use modLocalRuntime to add these to the development runtime, but not at compile time or for consumers of this project
     modLocalRuntime(libs.paucal.fabric)
     modLocalRuntime(libs.patchouli.fabric)
+    // Compile access to cardinal-components so the Fabric entity hook
+    // (HexMobCardinalComponents: IotaEntity -> HexCardinalComponents.IOTA_HOLDER)
+    // can be compiled; the rest of the family stays on modLocalRuntime.
+    modImplementation(libs.cardinalComponents)
     modLocalRuntime(libs.cardinalComponents)
     modLocalRuntime(libs.serializationHooks)
     modLocalRuntime(libs.trinkets)

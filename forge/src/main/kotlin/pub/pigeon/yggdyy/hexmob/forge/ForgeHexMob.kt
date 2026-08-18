@@ -20,6 +20,7 @@ class ForgeHexMob {
         }
         HexMob.init()
         initRegistry(HexMobActions)
+        HexMobCapabilities.init()
         if(Platform.getEnv().isClient) {
             HexMobEntityRenderers.init()
         }

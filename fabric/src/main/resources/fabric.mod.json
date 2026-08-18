@@ -30,6 +30,10 @@
     "modmenu": [{
       "adapter": "kotlin",
       "value": "pub.pigeon.yggdyy.hexmob.fabric.FabricHexMobModMenu"
+    }],
+    "cardinal-components-entity": [{
+      "adapter": "kotlin",
+      "value": "pub.pigeon.yggdyy.hexmob.fabric.HexMobCardinalComponents"
     }]
   },
   "mixins": [
