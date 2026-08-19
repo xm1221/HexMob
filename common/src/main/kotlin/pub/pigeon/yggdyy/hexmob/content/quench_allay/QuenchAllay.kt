@@ -1,11 +1,16 @@
 package pub.pigeon.yggdyy.hexmob.content.quench_allay
 
+import at.petrak.hexcasting.api.addldata.ADMediaHolder
+import at.petrak.hexcasting.api.utils.compareMediaItem
 import at.petrak.hexcasting.api.utils.downcast
+import at.petrak.hexcasting.api.utils.extractMedia
 import at.petrak.hexcasting.api.utils.serializeToNBT
 import at.petrak.hexcasting.api.utils.vecFromNBT
+import at.petrak.hexcasting.xplat.IXplatAbstractions
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.LongArrayTag
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.animal.allay.Allay
 import net.minecraft.world.level.Level
@@ -15,7 +20,6 @@ import pub.pigeon.yggdyy.hexmob.api.entity.CastingEntity
 import pub.pigeon.yggdyy.hexmob.api.entity.IotaEntity
 import pub.pigeon.yggdyy.hexmob.api.entity.defineIotaAccessor
 import pub.pigeon.yggdyy.hexmob.api.entity.emptyIotaTag
-import pub.pigeon.yggdyy.hexmob.api.entity.extractMediaFromHands
 
 /**
  * A quenched allay (淬晶悦灵): an allay that doubles as an iota carrier and
@@ -34,8 +38,33 @@ class QuenchAllay(entityType: EntityType<out QuenchAllay>, level: Level) : Allay
         private val TARGET_KEY: String = HexMob.id("target").toString()
     }
 
-    override fun consumeMedia(cost: Long, simulate: Boolean): Long =
-        this.extractMediaFromHands(cost, simulate)
+    /**
+     * Pays media from both hands *and* this allay's inventory (allays carry
+     * their items in the inventory, not in a held slot). Any item that exposes
+     * a media holder works here — amethyst dust/shards, media phials (媒质之瓶),
+     * packaged spells, etc. — consumed in Hex's priority order.
+     */
+    override fun consumeMedia(cost: Long, simulate: Boolean): Long {
+        if (cost <= 0) return 0
+        val sources = mutableListOf<ADMediaHolder>()
+        for (hand in arrayOf(InteractionHand.MAIN_HAND, InteractionHand.OFF_HAND)) {
+            IXplatAbstractions.INSTANCE.findMediaHolder(getItemInHand(hand))
+                ?.takeIf { it.canProvide() }?.let(sources::add)
+        }
+        val inv = getInventory()
+        for (i in 0 until inv.containerSize) {
+            IXplatAbstractions.INSTANCE.findMediaHolder(inv.getItem(i))
+                ?.takeIf { it.canProvide() }?.let(sources::add)
+        }
+        sources.sortWith(::compareMediaItem)
+        sources.reverse()
+        var costLeft = cost
+        for (holder in sources) {
+            if (costLeft <= 0) break
+            costLeft -= extractMedia(holder, costLeft, false, simulate)
+        }
+        return costLeft
+    }
 
     override fun getCastingRange(): Double = 32.0
 

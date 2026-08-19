@@ -22,7 +22,7 @@ object OpAllayCasting: SpellAction {
         env: CastingEnvironment
     ): SpellAction.Result {
         val entity = args.getLivingEntityButNotArmorStand(0,argc)
-        val spell = args.getList(0, argc)
+        val spell = args.getList(1, argc)
         if(entity is QuenchAllay && env.isEntityInRange(entity)) {
             return SpellAction.Result(
                 effect = object : RenderedSpell{
