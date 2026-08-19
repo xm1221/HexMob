@@ -9,6 +9,7 @@ import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.content.amethyst_silverfish.AmethystSilverfishEntity
 import pub.pigeon.yggdyy.hexmob.content.crying_amethyst.CryingAmethystEntity
 import pub.pigeon.yggdyy.hexmob.content.iota_sheep.IotaSheepEntity
+import pub.pigeon.yggdyy.hexmob.content.quench_allay.QuenchAllay
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedPatternEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 
@@ -47,5 +48,11 @@ object HexMobEntities {
             { type, level -> IotaSheepEntity(type, level) },
             MobCategory.CREATURE
         ).sized(0.9F, 1.3F).build("iota_sheep")
+    }
+    val QUENCH_ALLAY: DeferredSupplier<EntityType<QuenchAllay>> = ENTITIES.register("quench_allay") {
+        EntityType.Builder.of(
+            { type, level -> QuenchAllay(type, level) },
+            MobCategory.CREATURE
+        ).sized(0.35F, 0.6F).build("quench_allay")
     }
 }

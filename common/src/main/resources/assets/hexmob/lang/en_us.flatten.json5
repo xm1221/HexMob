@@ -11,7 +11,19 @@
             "": "Transform Stimulated Pattern",
             "0": "Accept the position of a $(l:hexcasting:items/stimulated_slate)stimulated slate$(/l), a $(l:hexcasting:hexmob/stimulated_pattern)stimulated pattern entity$(/l) and a pattern. Try to transform the stimulated pattern entity into the stimulated slate. Cost 10 amethyst dust",
             "1": "If the given pattern has the save stroke as the pattern of the stimulated pattern entity, the entity will discard and the stimulated slate will be written with the very pattern. Otherwise, the entity will lose with 5 heath point while nothing other happen."
-          }
+        },
+        "quench_allay_create": {
+          "": "Transform Quench Allay",
+          "0": "Accept an allay; cost one quenched shard and transmute it into a quench allay, keeping what it carries."
+        },
+        "quench_allay_move": {
+          "": "Command Quench Allay",
+          "0": "Accept a quench allay and a vector; command it to fly to that point."
+        },
+        "quench_allay_cast": {
+          "": "Cast For Quench Allay",
+          "0": "Accept a quench allay and a list of iotas; it casts that spell itself with its own media."
+        }
         },
         great_spells: {
           /*dummy_great_spells: {
@@ -43,6 +55,11 @@
           "": "Iota Sheep",
           "0": "These odd sheep frequent the edges of fields, each carrying a single iota knotted into its fleece. The colour of the wool shifts with the type of iota it holds, and shearing one yields a few $(l:hexcasting:items/thought_knot)Thought-Knots$(/l), each holding a copy of that iota.",
           "1": "The iota isn't merely decoration — the sheep obeys what it stores. A vector sets it wandering toward that point; an entity makes it trail that creature; a list of vectors turns it into a little patrol; any other list simply cycles the colour of its wool. Hexers have taken to leaving iotas on these sheep just to watch them steer."
+        },
+        "quench_allay": {
+          "": "Quench Allay",
+          "0": "After a surpassing enlightenment, I came to command media and thought beyond the common measure. Inspired by the Iota Sheep, I set out to shape another creature that could bear an iota. After many trials — fusing a quenched amethyst into a willing allay — I succeeded beyond expectation. The quench allay I wrought holds an iota like the Iota Sheep, yet can be steered by spells with ease, and may even cast in its own name.",
+          "1": "Related patterns: $(l:hexcasting:patterns/spells/quench_allay_create)Transform Quench Allay$(/l), $(l:hexcasting:patterns/spells/quench_allay_move)Command Quench Allay$(/l) and $(l:hexcasting:patterns/spells/quench_allay_cast)Cast For Quench Allay$(/l)."
         }
       }
     },
@@ -52,7 +69,10 @@
       "hexmob:": {
         /*congratulate: "Congratulate Player",
         "congratulate/great": "Great Congrats!",*/
-        "transform_stimulated_pattern": "Transform Stimulated Pattern"
+        "transform_stimulated_pattern": "Transform Stimulated Pattern",
+        "quench_allay": "Transform Quench Allay",
+        "quench_allay/move": "Command Quench Allay",
+        "quench_allay/cast": "Cast For Quench Allay"
       },
       // use this to add shortened versions of pattern names if the full name won't fit in the ingame book
       // you don't need to add an entry for every pattern - the above value will be used as a default
@@ -111,12 +131,14 @@
       "stimulated_pattern": "Stimulated Pattern",
       "crying_amethyst": "Crying Amethyst",
       "amethyst_silverfish": "Amethyst Silverfish",
-      "iota_sheep": "Iota Sheep"
+      "iota_sheep": "Iota Sheep",
+      "quench_allay": "Quench Allay"
     }
   },
   "item": {
     "hexmob": {
-      "iota_sheep_spawn_egg": "Iota Sheep Spawn Egg"
+      "iota_sheep_spawn_egg": "Iota Sheep Spawn Egg",
+      "quench_allay_spawn_egg": "Quenched Allay Spawn Egg"
     }
   },
   "itemGroup": {

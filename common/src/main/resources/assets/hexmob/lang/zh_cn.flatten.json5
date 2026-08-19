@@ -2,6 +2,22 @@
   // Hex Mob 中文本地化（zh_cn）
   hexmob: {
     book: {
+      patterns: {
+        spells: {
+          "quench_allay_create": {
+            "": "转化淬晶悦灵",
+            "0": "接受一只悦灵，消耗一枚淬晶碎片，将其转化为淬晶悦灵（随身物品一并保留）。"
+          },
+          "quench_allay_move": {
+            "": "提线木偶之策略",
+            "0": "接受淬晶悦灵与一个向量，使其飞向该点。"
+          },
+          "quench_allay_cast": {
+            "": "傀儡师之策略",
+            "0": "接受淬晶悦灵与一串 iota，使其以自身媒质施放该法术。"
+          }
+        }
+      },
       hexmob: {
         "name": "奇妙的生物",
         "description": "此分类收录了我在世界各地收集到的奇妙生物记录。",
@@ -19,6 +35,11 @@
           "": "咒念羊",
           "0": "这些古怪的羊时常出没于原野的边缘，每一只都把某个 Iota 系进了羊毛里。羊毛的颜色会随其承载的 Iota 类型而流转，而剪下羊毛，便能得到几枚$(l:hexcasting:items/thought_knot)结念绳$(/l)，每一枚都复写了一份那个iota。咒念羊可以用$(action)编年史家之纯化$()和$(action)编年史家之策略$()读写。",
           "1": "那 iota 可不只是装饰——羊会照它所承载的意志行事。向量Iota会让它慢慢的朝那一点踱去；一枚实体Iota则让它不由自主地靠近那生灵；向量列表会叫它化身为小小巡哨，在列表规定的几个向量处反复巡游；若是别的列表，则只是让羊毛的颜色周而复始地轮转。$(br2)如今已有咒术师习惯于往羊身上托付 Iota，只为看它们如何一边“咩咩”叫着，一边不由自主地做着蠢事。"
+        },
+        "quench_allay": {
+          "": "淬晶悦灵",
+          "0": "历经卓越的启迪，我已对媒质与意识有了超乎寻常的掌控。受咒念羊的启发，我着手创造另一种能够储存 Iota 的生物。经数次试验，令淬灵晶与悦灵互为相融，终获成功，而结果远超预期——我所创造的淬晶悦灵，不仅能像咒念羊那般储存 Iota，亦能被法术轻易拨弄，甚至能以它自身的名义施法。",
+          "1": "相关图案：$(l:hexcasting:patterns/spells/quench_allay_create)转化淬晶悦灵$(/l)、$(l:hexcasting:patterns/spells/quench_allay_move)提线木偶之策略$(/l)、$(l:hexcasting:patterns/spells/quench_allay_cast)傀儡师之策略$(/l)。"
         }
       }
     }
@@ -26,7 +47,10 @@
   hexcasting: {
     action: {
       "hexmob:": {
-        "transform_stimulated_pattern": "转化活化图案"
+        "transform_stimulated_pattern": "转化活化图案",
+        "quench_allay": "转化淬晶悦灵",
+        "quench_allay/move": "提线木偶之策略",
+        "quench_allay/cast": "傀儡师之策略"
       }
     }
   },
@@ -35,12 +59,14 @@
       "stimulated_pattern": "活化图案",
       "crying_amethyst": "尖叫紫水晶",
       "amethyst_silverfish": "紫水晶蠹虫",
-      "iota_sheep": "咒念羊"
+      "iota_sheep": "咒念羊",
+      "quench_allay": "淬晶悦灵"
     }
   },
   "item": {
     "hexmob": {
-      "iota_sheep_spawn_egg": "咒念羊刷怪蛋"
+      "iota_sheep_spawn_egg": "咒念羊刷怪蛋",
+      "quench_allay_spawn_egg": "淬晶悦灵刷怪蛋"
     }
   },
   "itemGroup": {

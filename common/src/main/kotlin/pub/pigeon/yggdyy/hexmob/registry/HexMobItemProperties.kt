@@ -19,6 +19,7 @@ object HexMobItemProperties {
         ColorHandlerRegistry.registerItemColors(
             { stack: ItemStack, tintIndex: Int -> (stack.item as SpawnEggItem).getColor(tintIndex) },
             HexMobItems.IOTA_SHEEP_SPAWN_EGG.get(),
+            HexMobItems.QUENCH_ALLAY_SPAWN_EGG.get(),
         )
     }
 }

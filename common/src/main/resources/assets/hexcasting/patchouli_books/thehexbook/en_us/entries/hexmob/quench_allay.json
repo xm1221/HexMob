@@ -1,0 +1,16 @@
+{
+  "name": "hexmob.book.hexmob.quench_allay",
+  "category": "hexcasting:hexmob",
+  "icon": "hexmob:quench_allay_spawn_egg",
+  "advancement": "hexcasting:enlightenment",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "hexmob.book.hexmob.quench_allay.0"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "hexmob.book.hexmob.quench_allay.1"
+    }
+  ]
+}

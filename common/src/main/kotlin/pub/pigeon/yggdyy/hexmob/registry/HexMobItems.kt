@@ -14,16 +14,25 @@ object HexMobItems {
 
     private const val WHITE: Int = 0xFF_FFFFFF.toInt()
     private const val AMETHYST_PURPLE: Int = 0xFF_7B2FBE.toInt()
+    private const val ALLAY_CYAN: Int = 0xFF_7AC4E8.toInt()
 
     private val ITEMS: DeferredRegister<Item> = DeferredRegister.create(HexMob.MODID, Registries.ITEM)
 
-    // Note: HexMobEntities.init() must run BEFORE HexMobItems.init() so this
-    // factory can resolve IOTA_SHEEP's EntityType when it is built.
+    // Note: HexMobEntities.init() must run BEFORE HexMobItems.init() so these
+    // factories can resolve the EntityTypes when they are built.
     val IOTA_SHEEP_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("iota_sheep_spawn_egg") {
         SpawnEggItem(
             HexMobEntities.IOTA_SHEEP.get(),
             WHITE,            // wool base
             AMETHYST_PURPLE,  // hex/amethyst spots
+            Item.Properties(),
+        )
+    }
+    val QUENCH_ALLAY_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("quench_allay_spawn_egg") {
+        SpawnEggItem(
+            HexMobEntities.QUENCH_ALLAY.get(),
+            ALLAY_CYAN,       // allay cyan base
+            WHITE,            // bright spots
             Item.Properties(),
         )
     }

@@ -2,6 +2,7 @@ package pub.pigeon.yggdyy.hexmob.registry
 
 import dev.architectury.registry.level.entity.EntityAttributeRegistry
 import net.minecraft.world.entity.animal.Sheep
+import net.minecraft.world.entity.animal.allay.Allay
 import pub.pigeon.yggdyy.hexmob.content.amethyst_silverfish.AmethystSilverfishEntity
 import pub.pigeon.yggdyy.hexmob.content.crying_amethyst.CryingAmethystEntity
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedPatternEntity
@@ -14,5 +15,6 @@ object HexMobEntityAttributes {
         EntityAttributeRegistry.register(HexMobEntities.AMETHYST_SILVERFISH) {AmethystSilverfishEntity.registerAttributes()}
         EntityAttributeRegistry.register(HexMobEntities.UR_CIRCLE) {UrCircleEntity.registerAttributes()}
         EntityAttributeRegistry.register(HexMobEntities.IOTA_SHEEP) { Sheep.createAttributes() }
+        EntityAttributeRegistry.register(HexMobEntities.QUENCH_ALLAY) { Allay.createAttributes() }
     }
 }
