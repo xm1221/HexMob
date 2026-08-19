@@ -67,8 +67,8 @@
         "congratulate/great": "Great Congrats!",*/
         "transform_stimulated_pattern": "Transform Stimulated Pattern",
         "quench_allay": "Transform Quench Allay",
-        "quench_allay/move": "Command Quench Allay",
-        "quench_allay/cast": "Cast For Quench Allay"
+        "quench_allay/move": "Marionette's Gambit",
+        "quench_allay/cast": "Puppeteer's Gambit"
       },
       // use this to add shortened versions of pattern names if the full name won't fit in the ingame book
       // you don't need to add an entry for every pattern - the above value will be used as a default
