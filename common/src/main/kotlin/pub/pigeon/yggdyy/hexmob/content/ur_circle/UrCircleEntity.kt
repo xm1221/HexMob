@@ -3,6 +3,7 @@ package pub.pigeon.yggdyy.hexmob.content.ur_circle
 import at.petrak.hexcasting.api.HexAPI
 import at.petrak.hexcasting.api.casting.math.HexDir
 import at.petrak.hexcasting.api.casting.math.HexPattern
+import at.petrak.hexcasting.api.casting.mishaps.Mishap
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
@@ -11,6 +12,7 @@ import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
@@ -19,12 +21,14 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import pub.pigeon.yggdyy.hexmob.HexMob
+import pub.pigeon.yggdyy.hexmob.api.entity.FlickeringEntity
 import pub.pigeon.yggdyy.hexmob.content.IHMMultipartEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.CubePart
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlatePart
 import pub.pigeon.yggdyy.hexmob.util.rotateDA
 
-class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entityType, level), Enemy, IHMMultipartEntity<UrCirclePart> {
+class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entityType, level), Enemy,
+    IHMMultipartEntity<UrCirclePart>, FlickeringEntity {
     val equator: MutableList<UrCirclePart> = mutableListOf(
         CubePart(this, HexAPI.modLoc("impetus/empty"), "energized=false,facing=south"),
         CubePart(this, HexAPI.modLoc("impetus/look"), "energized=false,facing=south"),
@@ -88,6 +92,11 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         noCulling = true
         IHMMultipartEntity.instances.add(this)
     }
+
+    // 索敌：周期锁定附近"有智慧"的生物（hexmob:wise tag），见 UrCircleTargetGoal。
+    override fun registerGoals() {
+        targetSelector.addGoal(1, UrCircleTargetGoal(this))
+    }
     override fun defineSynchedData() {
         super.defineSynchedData()
         entityData.define(EQUATOR_RADIUS, Vector3f(4F, 0F, 0F))
@@ -147,6 +156,9 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     override fun isPickable(): Boolean = false
     override fun getExperienceReward() = Enemy.XP_REWARD_BOSS
     override fun isNoGravity(): Boolean = true
+
+    /** 大环的"拒绝引用"事故：3 秒失明 + 自然文案。 */
+    override fun createFlickeringMishap(entity: net.minecraft.world.entity.Entity): Mishap = UrCircleFlickerMishap(this)
     override fun recreateFromPacket(packet: ClientboundAddEntityPacket) {
         super.recreateFromPacket(packet)
         val parts: List<UrCirclePart> = getAllParts()

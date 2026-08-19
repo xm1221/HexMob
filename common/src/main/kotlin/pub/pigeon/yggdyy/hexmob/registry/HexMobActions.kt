@@ -19,7 +19,7 @@ object HexMobActions : HexMobRegistrar<ActionRegistryEntry>(
 
     val QUENCH_ALLAY_CAST = make("quench_allay/cast", HexDir.EAST,"qqaqwwawwqaqq", OpAllayCasting)
 
-    val QUENCH_ALLAY_MOVE = make("quench_allay/move", HexDir.EAST,"qaawawaaq", OpAllayTarget)
+    val QUENCH_ALLAY_MOVE = make("quench_allay/move", HexDir.NORTH_EAST,"qaawawaaq", OpAllayTarget)
 
     val QUENCH_ALLAY_CREATE = make("quench_allay", HexDir.EAST,"qqqqadedqqqdqqqqadedqqqdqqqqwaqaeqq", OpQuenchAllayCreate)
     private fun make(name: String, startDir: HexDir, signature: String, action: Action) =

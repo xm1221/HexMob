@@ -68,6 +68,9 @@ class QuenchAllay(entityType: EntityType<out QuenchAllay>, level: Level) : Allay
 
     override fun getCastingRange(): Double = 32.0
 
+    /** A quench allay casts as if enlightened (it may use great spells). */
+    override fun isEnlightened(): Boolean = true
+
     // 数据放 entityData：自动同步到客户端
     override fun defineSynchedData() {
         super.defineSynchedData()

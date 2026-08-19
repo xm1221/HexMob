@@ -8,6 +8,7 @@
   ],
   "mixins": [
     "BlockSconceMixin",
+    "EntityIotaFlickerMixin",
     "GeodeFeatureMixin",
     "LevelMixin",
     "ServerLevelMixin",
