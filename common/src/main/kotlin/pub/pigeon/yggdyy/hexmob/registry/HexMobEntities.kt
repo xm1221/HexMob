@@ -12,6 +12,7 @@ import pub.pigeon.yggdyy.hexmob.content.iota_sheep.IotaSheepEntity
 import pub.pigeon.yggdyy.hexmob.content.quench_allay.QuenchAllay
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedPatternEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.SlateProjectile
 
 object HexMobEntities {
     fun init() {
@@ -54,5 +55,11 @@ object HexMobEntities {
             { type, level -> QuenchAllay(type, level) },
             MobCategory.CREATURE
         ).sized(0.35F, 0.6F).build("quench_allay")
+    }
+    val SLATE_PROJECTILE: DeferredSupplier<EntityType<SlateProjectile>> = ENTITIES.register("slate_projectile") {
+        EntityType.Builder.of(
+            { type, level -> SlateProjectile(type, level) },
+            MobCategory.MISC
+        ).sized(0.5F, 0.5F).build("slate_projectile")
     }
 }
