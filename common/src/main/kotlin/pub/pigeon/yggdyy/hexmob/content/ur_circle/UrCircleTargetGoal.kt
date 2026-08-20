@@ -2,6 +2,7 @@ package pub.pigeon.yggdyy.hexmob.content.ur_circle
 
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ai.goal.target.TargetGoal
+import net.minecraft.world.entity.player.Player
 import pub.pigeon.yggdyy.hexmob.registry.HexMobTags
 
 /**
@@ -11,7 +12,9 @@ import pub.pigeon.yggdyy.hexmob.registry.HexMobTags
  * 关键点：
  * - 每 10 tick 重扫一次（canUse/canContinueToUse/tick 都会触发），
  *   解决"锁死第一个目标永不换"的问题；
- * - 已有存活目标时不抢换，保证"被打还击"（hurt() 设的目标）能一直钉在玩家身上。
+ * - 已有存活目标时不抢换，保证"被打还击"（hurt() 设的目标）能一直钉在玩家身上；
+ * - **不索敌创造模式玩家**（大环不会主动招惹旁观者）；
+ * - 锁定的目标会加入大环的仇恨列表（多目标攻击）。
  *
  * 大环是 Mob 而非 PathfinderMob，用不了 vanilla 的 NearestAttackableTargetGoal，
  * 所以自写一个（TargetGoal 只需 Mob）。
@@ -34,17 +37,24 @@ class UrCircleTargetGoal(private val circle: UrCircleEntity) : TargetGoal(circle
         rescanIfDue()
     }
 
-    /** 每 10 tick 重扫：仅当没有存活目标时才重新锁定最近的智慧生物。 */
+    /** 每 10 tick 重扫：仅当没有存活目标时才重新锁定（跳过创造模式玩家）。
+     *  多目标时按优先级选：**最优先玩家、其次剩余生命值最高**（见 UrCircleEntity.preferredTargets）。 */
     private fun rescanIfDue() {
         if (circle.tickCount % 10 != 0) return
         val cur = circle.target
         if (cur != null && cur.isAlive) return
-        val target = circle.level()
-            .getEntitiesOfClass(LivingEntity::class.java, circle.boundingBox.inflate(32.0))
-            .filter { it.isAlive && it !== circle && it.type.`is`(HexMobTags.EntityTypeTags.WISE) }
-            .minByOrNull { it.distanceToSqr(circle) }
+        val target = circle.preferredTargets(
+            circle.level()
+                .getEntitiesOfClass(LivingEntity::class.java, circle.boundingBox.inflate(32.0))
+                .filter {
+                    it.isAlive && it !== circle &&
+                        !(it is Player && it.isCreative) &&
+                        it.type.`is`(HexMobTags.EntityTypeTags.WISE)
+                }
+        ).firstOrNull()
         if (target != null) {
             circle.target = target
+            circle.addToHated(target)
         }
     }
 }

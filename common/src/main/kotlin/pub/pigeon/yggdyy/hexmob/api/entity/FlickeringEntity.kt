@@ -17,7 +17,7 @@ import pub.pigeon.yggdyy.hexmob.api.mishap.MishapFlickeringEntity
 interface FlickeringEntity {
     /** 一个完整失效周期的长度（tick）。 */
     val flickerPeriodTicks: Int
-        get() = 120
+        get() = 20
 
     /** 每个周期内引用保持失效的时长（tick）。 */
     val flickerInvalidTicks: Int
@@ -25,7 +25,7 @@ interface FlickeringEntity {
 
     /** 失效窗口在周期内的起始偏移（tick）。 */
     val flickerOffsetTicks: Int
-        get() = 60
+        get() = 0
 
     /** 在世界时间 [gameTime] 时，指向本实体的引用是否应当失效。 */
     fun isReferenceFlickering(gameTime: Long): Boolean {

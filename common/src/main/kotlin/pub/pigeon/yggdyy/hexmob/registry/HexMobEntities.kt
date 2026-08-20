@@ -13,6 +13,8 @@ import pub.pigeon.yggdyy.hexmob.content.quench_allay.QuenchAllay
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedPatternEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.SlateProjectile
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.serpent.UrCircleSerpent
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.servant.UrCircleServant
 
 object HexMobEntities {
     fun init() {
@@ -61,5 +63,17 @@ object HexMobEntities {
             { type, level -> SlateProjectile(type, level) },
             MobCategory.MISC
         ).sized(0.5F, 0.5F).build("slate_projectile")
+    }
+    val UR_CIRCLE_SERPENT: DeferredSupplier<EntityType<UrCircleSerpent>> = ENTITIES.register("ur_circle_serpent") {
+        EntityType.Builder.of(
+            { type, level -> UrCircleSerpent(type, level) },
+            MobCategory.MISC
+        ).sized(0.9F, 0.9F).build("ur_circle_serpent")
+    }
+    val UR_CIRCLE_SERVANT: DeferredSupplier<EntityType<UrCircleServant>> = ENTITIES.register("ur_circle_servant") {
+        EntityType.Builder.of(
+            { type, level -> UrCircleServant(type, level) },
+            MobCategory.MONSTER
+        ).sized(0.6F, 1.2F).build("ur_circle_servant")
     }
 }

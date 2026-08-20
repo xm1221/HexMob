@@ -4,28 +4,41 @@ import at.petrak.hexcasting.api.HexAPI
 import at.petrak.hexcasting.api.casting.math.HexDir
 import at.petrak.hexcasting.api.casting.math.HexPattern
 import at.petrak.hexcasting.api.casting.mishaps.Mishap
+import at.petrak.hexcasting.common.lib.HexBlocks
+import at.petrak.hexcasting.common.lib.HexDamageTypes
+import net.minecraft.sounds.SoundEvent
 import at.petrak.hexcasting.common.lib.HexSounds
 import net.minecraft.core.BlockPos
+import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.server.level.ServerBossEvent
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.BossEvent
 import net.minecraft.world.effect.MobEffectInstance
+import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.ExperienceOrb
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
+import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.entity.monster.Enemy
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
@@ -34,9 +47,29 @@ import pub.pigeon.yggdyy.hexmob.api.entity.FlickeringEntity
 import pub.pigeon.yggdyy.hexmob.content.IHMMultipartEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.CubePart
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlatePart
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.servant.UrCircleServant
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.AmethystTrapSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.BeamSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.CurseSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.EruptSerpentSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.ExplosionSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.HexMobBacklash
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.LightningSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.MishapSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.RecoverSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.RingSpinSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.SerpentSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.SummonServantSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.UrCircleMishap
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.UrCircleSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.UrCircleStatusTable
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
+import pub.pigeon.yggdyy.hexmob.registry.HexMobItems
 import pub.pigeon.yggdyy.hexmob.util.rotateDA
+import pub.pigeon.yggdyy.hexmob.util.spawnParticle
 import java.util.UUID
+import kotlin.math.cos
+import kotlin.math.sin
 
 class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entityType, level), Enemy,
     IHMMultipartEntity<UrCirclePart>, FlickeringEntity {
@@ -70,7 +103,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         SlatePart(this, HexPattern.fromAnglesUnchecked("wqadaqw", HexDir.NORTH_EAST)),
         SlatePart(this, HexPattern.fromAnglesUnchecked("eqqwqwqeda", HexDir.SOUTH_EAST)),
     )
-    val earth: CubePart = CubePart(this, HexMob.id("cube"), 2F, 2F, HexAPI.modLoc("quenched_allay_bricks"), "")
+    /** 核心（地球）方块部件：模型指向 hexmob:block/ur_circle_core（隐藏技术方块提供模型，贴图 ur_circle_core.png）。 */
+    val earth: CubePart = CubePart(this, HexMob.id("cube"), 2F, 2F, HexMob.id("ur_circle_core"), "")
     var equatorRadius: Vec3
         get() = Vec3(entityData.get(EQUATOR_RADIUS))
         set(value) = entityData.set(EQUATOR_RADIUS, value.toVector3f())
@@ -117,8 +151,45 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     private var chargeDir = Vec3.ZERO
     /** 贴地破坏冷却：防止轮盘每 tick 刷坑刷音效。 */
     private var groundCraterCooldown = 0
+    /** 巡航空闲自动补下属的间隔计时。 */
+    private var servantSummonCooldown = 0
     /** Boss 血条（仅服务器端）：凋灵式，随距离加入/移除玩家。 */
     private var bossEvent: ServerBossEvent? = null
+    /** setHealth 免疫用的内部写血标记：仅在自身 hurt 流程/读档时置真。 */
+    private var internalHealthWrite = false
+    /** 蓄力技能列表：吟唱冷却好时在"满足 canUse 的技能"里按权重随机抽一个进入 CHANNELING
+     *  （见 [pickWeightedSkill]；权重见各技能 weight）。 */
+    val skills: MutableList<UrCircleSkill> = mutableListOf(
+        SummonServantSkill(),
+        ExplosionSkill(),
+        CurseSkill(),
+        MishapSkill(),
+        AmethystTrapSkill(),
+        LightningSkill(),
+        RecoverSkill(),
+        BeamSkill(),
+        SerpentSkill(),
+        RingSpinSkill(),
+        EruptSerpentSkill()
+    )
+    /** 当前正在吟唱的技能。 */
+    private var currentSkill: UrCircleSkill? = null
+    /** 当前正在释放光束的技能（BEAM 状态）。 */
+    var beamSkill: UrCircleSkill? = null
+    /** 吟唱音效脉冲计时。 */
+    private var channelPulseTimer = 0
+    /** 吟唱粒子脉冲计时（每几 tick 一波）。 */
+    private var channelParticleTimer = 0
+    /** 技能冷却：释放后一段时间不再进入吟唱。 */
+    private var skillCooldown = 0
+    /** 反向过度施法：玩家施法积累的反噬值（服务端瞬态，不存档）。 */
+    private var backlash = 0
+    /** 反噬节流：上次积累的 tick，防止同一施法被多次触发。 */
+    private var lastBacklashTick = 0
+    /** 仇恨实体列表（服务端瞬态）：大环可同时对多个实体保持仇恨；
+     *  自爆/紫水晶/闪电等技能同时作用于列表内所有目标（多目标攻击）。
+     *  受击来源与索敌目标都会加入。 */
+    private val hatedTargets: MutableList<LivingEntity> = mutableListOf()
     init {
         noPhysics = true
         noCulling = true
@@ -145,6 +216,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         entityData.define(EARTH_ROTATION, 0F)
         entityData.define(STATE, CircleState.CRUISE.ordinal)
         entityData.define(STATE_TICKS, 0)
+        entityData.define(TUMBLING, false)
+        entityData.define(RING_SPINNING, false)
     }
     override fun aiStep() {
         super.aiStep()
@@ -153,13 +226,21 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         if (!level().isClientSide) {
             if (homePos == null) homePos = position()
             stateTicks += 1
+            // 维护仇恨列表：清理死亡/超距/敌对的，无 target 时自动锁最优目标（先玩家、再剩余血量最高）
+            hatedTargets.removeAll { !it.isAlive || it.isRemoved || it is Enemy || distanceToSqr(it) > HATE_RANGE * HATE_RANGE }
+            if (target == null) {
+                target = preferredTargets(currentHated()).firstOrNull()
+            }
             combatBrain()
-            hurtContacts()
-            tryFireSlate()
-            groundContact()
-            // 常态环境声：法术环吟唱（约每 5 秒一次）
-            if (tickCount % AMBIENT_SOUND_INTERVAL == 0) {
-                level().playSound(null, blockPosition(), HexSounds.CASTING_AMBIANCE, SoundSource.HOSTILE, 1.2F, 1.0F)
+            // 死亡演出期间只播演出，不碰撞/不发射/不啃地/不播常态环境声
+            if (circleState != CircleState.DYING) {
+                hurtContacts()
+                tryFireSlate()
+                groundContact()
+                // 常态环境声：法术环吟唱（约每 5 秒一次）
+                if (tickCount % AMBIENT_SOUND_INTERVAL == 0) {
+                    level().playSound(null, blockPosition(), HexSounds.CASTING_AMBIANCE, SoundSource.HOSTILE, 1.2F, 1.0F)
+                }
             }
             updateBossBar()
         }
@@ -179,34 +260,89 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     }
     /** 旋转速度因子：随怒气增强最猛——索敌/低血时转得明显更快。 */
     fun rotationSpeedFactor(): Float = 1.0F + (currentAnger() - 1.0F) * 1.5F
+    /** 死亡演出的转速倍率（纯 stateTicks 函数，客户端同公式推导）：先加快后减慢——0..SPIN_UP 1→3 倍，SPIN_UP..SPIN_DOWN_END 3→0，之后停。 */
+    fun deathSpinFactor(): Float {
+        val t = stateTicks.toFloat()
+        return when {
+            t <= SPIN_UP_TICKS -> 1.0F + (t / SPIN_UP_TICKS) * 2.0F
+            t <= SPIN_DOWN_END -> {
+                val p = (t - SPIN_UP_TICKS) / (SPIN_DOWN_END - SPIN_UP_TICKS).toFloat()
+                3.0F * (1.0F - p)
+            }
+            else -> 0.0F
+        }
+    }
+
+    /** 环刃风暴的吟唱进度（0..1）：RING_SPINNING 同步标志 + stateTicks 确定性推导（客户端同公式）。 */
+    fun ringSpinProgress(): Float {
+        if (!entityData.get(RING_SPINNING)) return 0.0F
+        return (stateTicks.toFloat() / RingSpinSkill.CHANNEL_TICKS).coerceIn(0.0F, 1.0F)
+    }
+
+    /** 环刃风暴的部件/半径放大倍率：1 → RING_SPIN_MAX_SCALE（渲染与命中判定共用）。 */
+    fun ringSpinScale(): Float = 1.0F + ringSpinProgress() * (RING_SPIN_MAX_SCALE - 1.0F)
     /** 移动速度因子：强烈阻尼，移速基本保持稳定。 */
     fun moveSpeedFactor(): Float = 1.0F + (currentAnger() - 1.0F) * 0.3F
     /** 射速因子：中等阻尼，射速可以稍快但不夸张。 */
     fun fireRateFactor(): Float = 1.0F + (currentAnger() - 1.0F) * 0.6F
     fun updateShape() {
         if(!level().isClientSide) {
-            val rot = rotationSpeedFactor()
+            val base = rotationSpeedFactor()
+            // 蓄力吟唱：转速随时间线性衰减，完全停下的瞬间释放技能
+            val rot = if (isProtected()) {
+                // 保护状态（血量>90% 且有下属）：停转
+                0.0F
+            } else if (circleState == CircleState.CHANNELING && currentSkill is RingSpinSkill) {
+                // 环刃风暴：转速不衰减反而飙升（1→3 倍），环像绞肉机一样转起来
+                base * (1.0F + ringSpinProgress() * 2.0F)
+            } else if (circleState == CircleState.CHANNELING) {
+                val duration = currentSkill?.channelTicks ?: 1
+                val progress = (stateTicks.toFloat() / duration).coerceIn(0.0F, 1.0F)
+                base * (1.0F - progress)
+            } else if (circleState == CircleState.DYING) {
+                // 死亡演出：转速先加快后减慢（1→3→0），同时赤道/黄道面各自绕半径轴翻滚
+                base * deathSpinFactor()
+            } else {
+                base
+            }
             equatorRotation += -1 * rot
             eclipticRotation += 1 * rot
+            // 可打断技能吟唱 / 死亡演出时置真：赤道/黄道面绕各自半径轴旋转（updatePartsPos 读取）
+            val tumbling = circleState == CircleState.CHANNELING && currentSkill?.channelInterruptible == true
+                || circleState == CircleState.DYING
+            entityData.set(TUMBLING, tumbling)
+            // 环刃风暴：置同步标志（客户端据此推导部件/半径放大渲染）
+            val ringSpinning = circleState == CircleState.CHANNELING && currentSkill is RingSpinSkill
+            entityData.set(RING_SPINNING, ringSpinning)
         }
     }
     fun updatePartsPos() {
         val origin: Vec3 = position().add(0.0, bbHeight / 2.0, 0.0)
         earth.changeState(origin, if(target != null) target!!.position().subtract(origin).normalize() else Vec3(0.0, 0.0, 1.0))
+        // 可打断技能吟唱 / 死亡演出：赤道/黄道面各自绕自己的半径轴旋转（翻滚动画）
+        val tumbling = entityData.get(TUMBLING)
+        val spinMul = if (circleState == CircleState.DYING) deathSpinFactor() else 1.0F
+        val tumbleDeg = if (tumbling) stateTicks.toFloat() * CHANNEL_TUMBLE_SPEED * spinMul else 0.0F
+        val eqN = if (tumbling) equatorNormal.rotateDA(tumbleDeg, equatorRadius.normalize()) else equatorNormal
+        val ecN = if (tumbling) eclipticNormal.rotateDA(tumbleDeg, eclipticRadius.normalize()) else eclipticNormal
+        // 环刃风暴：赤道/黄道半径随膨胀倍率扩展（部件位置外推）
+        val ringScale = ringSpinScale()
         for(i in 0..<equator.size) {
             val deg: Float = equatorRotation + (i / equator.size.toFloat() * 360F)
-            val delta: Vec3 = equatorRadius.rotateDA(deg, equatorNormal)
-            equator[i].changeState(origin.add(delta), equatorNormal.cross(delta).normalize())
+            val delta: Vec3 = equatorRadius.rotateDA(deg, eqN).scale(ringScale.toDouble())
+            equator[i].changeState(origin.add(delta), eqN.cross(delta).normalize())
         }
         for(i in 0..<ecliptic.size) {
             val deg: Float = eclipticRotation + (i / ecliptic.size.toFloat() * 360F)
-            val delta: Vec3 = eclipticRadius.rotateDA(deg, eclipticNormal)
+            val delta: Vec3 = eclipticRadius.rotateDA(deg, ecN).scale(ringScale.toDouble())
             ecliptic[i].changeState(origin.add(delta), delta.normalize())
         }
     }
     /** 碰撞攻击：部件命中范围内的非敌对生物（玩家/村民/猪灵等）受到伤害+击退，每受害者带冷却。 */
     private fun hurtContacts() {
         if (level().isClientSide) return
+        if (isProtected()) return // 保护状态：停手
+        if (circleState == CircleState.CHANNELING && currentSkill is RingSpinSkill) return // 环刃风暴的碰撞伤害由技能自身结算
         // 冷却衰减
         val it = contactCooldowns.entries.iterator()
         while (it.hasNext()) {
@@ -232,6 +368,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     }
     /** 石板弹：周期从黄道石板（连续多块齐射）朝目标发射，弹体携带各自石板图案。仅巡航状态发射。 */
     private fun tryFireSlate() {
+        if (isProtected()) return // 保护状态：停手
         if (circleState != CircleState.CRUISE) return
         val t = target
         if (t == null || !t.isAlive) return
@@ -249,7 +386,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             val from = part.posNow
             // 发射口紫色魔法粒子
             for (k in 0 until 4) {
-                level().addParticle(
+                spawnParticle(
+                    level(),
                     ParticleTypes.AMBIENT_ENTITY_EFFECT,
                     from.x, from.y, from.z,
                     (random.nextDouble() - 0.5) * 0.1,
@@ -310,21 +448,112 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         super.remove(reason)
     }
     override fun die(source: DamageSource) {
+        // 死亡演出（参考末影龙）：不立刻 super.die/移除，进入 DYING 状态由 combatBrain 分段驱动，
+        // 演出末尾（核心毁灭后）才生成掉落并 remove()。期间不置 dead，保持实体数据同步让客户端播演出。
+        if (circleState == CircleState.DYING) return
+        circleState = CircleState.DYING
+        stateTicks = 0
+        currentSkill = null
+        beamSkill = null
         bossEvent?.removeAllPlayers()
-        super.die(source)
+        bossEvent = null
+        // 下属立即退场（不触 5 点反噬，避免死亡时连环扣血）
+        for (s in level().getEntitiesOfClass(UrCircleServant::class.java, getBoundingBox().inflate(48.0))) {
+            if (s.owner === this) s.remove(Entity.RemovalReason.KILLED)
+        }
+        // 清空仇恨，防止演出期间再索敌
+        hatedTargets.clear()
+        target = null
+    }
+
+    /** 死亡演出期间接管 vanilla 的死亡计时：血量归 0 后 vanilla 会在 deathTime>=20 时自动移除实体，
+     *  这会掐断演出。这里置空，移除完全由 DYING 序列在演出末尾 finishDeath() 统一执行（参考末影龙）。 */
+    override fun tickDeath() {
+        // 演出由 runDeathSequence（stateTicks）驱动，这里不再递增 deathTime / 广播死亡事件 / 移除
     }
     /**
-     * 冲撞状态机（第 3 步）：
-     * CRUISE(概率触发) → WINDUP(前摇：停住+粒子示警) → CHARGING(直线冲刺，锁定方向) → STAGGER(僵直恢复) → CRUISE。
+     * 大环状态机：
+     * - 冲撞：CRUISE(概率触发) → WINDUP(前摇) → CHARGING(直线冲刺) → STAGGER(僵直) → CRUISE；
+     * - 蓄力技能：CRUISE(满足 canUse 的技能) → CHANNELING(不移动、转速逐渐停止、脉冲粒子/音效)
+     *   → 完全停下放 CAST_THOTH + cast() → CRUISE（带冷却）。
      * 大脑在 moveControl 之后运行，冲刺速度可覆盖其残留巡航速度。
      */
     private fun combatBrain() {
+        // 死亡演出：接管状态机，逐段播放（加速→减速→渐熄→依次消失→核心毁灭→掉落）
+        if (circleState == CircleState.DYING) {
+            runDeathSequence()
+            return
+        }
+        // 保护状态（血量>90% 且仍有下属存活）：停手回巡航，等玩家清完下属
+        if (isProtected()) {
+            circleState = CircleState.CRUISE
+            stateTicks = 0
+            currentSkill = null
+            beamSkill = null
+            skillCooldown = SKILL_COOLDOWN
+            setDeltaMovement(deltaMovement.scale(0.85))
+            return
+        }
         when (circleState) {
             CircleState.CRUISE -> {
                 if (chargeCooldown > 0) chargeCooldown--
                 val t = target
                 if (t != null && t.isAlive && chargeCooldown <= 0 && stateTicks > 40 && random.nextFloat() < 0.01F) {
                     circleState = CircleState.WINDUP
+                    stateTicks = 0
+                    return
+                }
+                // 蓄力技能：冷却好且存在满足 canUse 的技能 → 进入吟唱（按权重随机抽）
+                if (skillCooldown > 0) skillCooldown--
+                if (skillCooldown <= 0) {
+                    val skill = pickWeightedSkill()
+                    if (skill != null) {
+                        currentSkill = skill
+                        channelPulseTimer = 0
+                        circleState = CircleState.CHANNELING
+                        stateTicks = 0
+                        level().playSound(null, blockPosition(), skill.channelStartSound(this), SoundSource.HOSTILE, skill.channelStartVolume(this), 1.0F)
+                        spawnChannelParticles(skill) // 吟唱开始瞬间就来一波，立即有反馈
+                    }
+                }
+            }
+            CircleState.CHANNELING -> {
+                val skill = currentSkill
+                if (skill == null) {
+                    // 保险：无技能就回巡航
+                    circleState = CircleState.CRUISE
+                    stateTicks = 0
+                    return
+                }
+                // 蓄力：不移动，速度衰减
+                setDeltaMovement(deltaMovement.scale(0.9))
+                // 技能每 tick 钩子（如光炮吟唱自发光）
+                skill.onChannelTick(this)
+                // 可标记目标的技能：吟唱期间给目标挂发光（标记即将被打者）
+                if (skill.channelMarksTarget(this)) {
+                    target?.addEffect(MobEffectInstance(MobEffects.GLOWING, 12, 0, false, false))
+                }
+                // 粒子：每 4 tick 一波持续向圆心汇聚（保证肉眼可见）
+                channelParticleTimer++
+                if (channelParticleTimer >= CHANNEL_PARTICLE_INTERVAL) {
+                    channelParticleTimer = 0
+                    spawnChannelParticles(skill)
+                }
+                // 音效脉冲：每 channelPulseInterval tick 一次（间隔/类型/音量由技能决定）
+                channelPulseTimer++
+                if (channelPulseTimer >= skill.channelPulseInterval(this)) {
+                    channelPulseTimer = 0
+                    level().playSound(null, blockPosition(), skill.channelPulseSound(this), SoundSource.HOSTILE, skill.channelPulseVolume(this), 1.0F)
+                }
+                // 完全停下：释放音效 + 释放技能（cast 可能切入 BEAM 状态）
+                if (stateTicks >= skill.channelTicks) {
+                    level().playSound(null, blockPosition(), skill.releaseSound(this), SoundSource.HOSTILE, skill.releaseVolume(this), 1.0F)
+                    skill.cast(this)
+                    currentSkill = null
+                    skillCooldown = SKILL_COOLDOWN
+                    if (circleState != CircleState.BEAM) {
+                        circleState = CircleState.CRUISE
+                    }
                     stateTicks = 0
                 }
             }
@@ -333,7 +562,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 setDeltaMovement(deltaMovement.scale(0.8))
                 for (k in 0 until 3) {
                     val part = equator[random.nextInt(equator.size)]
-                    level().addParticle(ParticleTypes.END_ROD, part.posNow.x, part.posNow.y, part.posNow.z, 0.0, 0.08, 0.0)
+                    spawnParticle(level(), ParticleTypes.END_ROD, part.posNow.x, part.posNow.y, part.posNow.z, 0.0, 0.08, 0.0)
                 }
                 if (stateTicks >= WINDUP_TICKS) {
                     val origin = position().add(0.0, bbHeight / 2.0, 0.0)
@@ -360,7 +589,130 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                     chargeCooldown = CHARGE_COOLDOWN
                 }
             }
-            CircleState.BEAM -> { /* 第 4 步：核心光线 */ }
+            CircleState.BEAM -> {
+                // 光束持续状态（第 4 步光炮）：cast() 调用 beginBeam 切入，每 tick 驱动技能
+                val skill = beamSkill
+                if (skill == null) {
+                    circleState = CircleState.CRUISE
+                    stateTicks = 0
+                } else {
+                    skill.onBeamTick(this)
+                    if (stateTicks >= skill.beamTicks(this)) {
+                        skill.onBeamEnd(this)
+                        beamSkill = null
+                        circleState = CircleState.CRUISE
+                        stateTicks = 0
+                    }
+                }
+            }
+            // 死亡演出已在函数顶部 runDeathSequence() 接管，这里不会走到
+            CircleState.DYING -> {}
+        }
+    }
+    // ---- 死亡演出（DYING，参考末影龙） ----
+
+    /** 每个部件"熄灭"的 tick（按全局序号 0..25：先内圈促动石 0..13，再外圈石板 14..25）。 */
+    fun deathExtinguishTick(globalIndex: Int): Int = EXTINGUISH_START + globalIndex * EXTINGUISH_STAGGER
+
+    /** 每个部件"消失"的 tick：全部熄灭后才开始依次消失。 */
+    fun deathVanishTick(globalIndex: Int): Int = VANISH_START + globalIndex * VANISH_STAGGER
+
+    /** 全局序号 → 部件（0..13 内圈促动石，14..25 外圈石板；核心 earth 单独处理）。 */
+    private fun partAt(globalIndex: Int): UrCirclePart? =
+        when {
+            globalIndex < equator.size -> equator[globalIndex]
+            globalIndex < equator.size + ecliptic.size -> ecliptic[globalIndex - equator.size]
+            else -> null
+        }
+
+    /** DYING 状态逐 tick：停住 → 逐部件消失播方块破坏粒子/音效 → 核心毁灭 → 掉落移除。 */
+    private fun runDeathSequence() {
+        setDeltaMovement(deltaMovement.scale(0.85)) // 停住
+        val t = stateTicks
+        for (i in 0 until TOTAL_PARTS) {
+            if (t == deathVanishTick(i)) {
+                val part = partAt(i) ?: continue
+                spawnPartBreak(part, isSlate = i >= equator.size)
+            }
+        }
+        if (t == CORE_BREAK_TICK) {
+            spawnCoreBreak()
+        }
+        if (t >= DEATH_END_TICK) {
+            finishDeath()
+        }
+    }
+
+    /** 部件消失：在部件位置炸开方块破坏粒子 + 破坏音效（服务端只发一次）。 */
+    private fun spawnPartBreak(part: UrCirclePart, isSlate: Boolean) {
+        val level = level()
+        val pos = part.posNow
+        if (pos == Vec3.ZERO) return
+        val particle = if (isSlate) SLATE_BREAK else STONE_BREAK
+        for (k in 0 until 20) {
+            spawnParticle(
+                level, particle,
+                pos.x, pos.y, pos.z,
+                (random.nextDouble() - 0.5) * 0.5, random.nextDouble() * 0.5, (random.nextDouble() - 0.5) * 0.5
+            )
+        }
+        level.playSound(null, blockPosition(), SoundEvents.STONE_BREAK, SoundSource.HOSTILE, 1.0F, 1.2F)
+    }
+
+    /** 核心毁灭（终幕）：紫水晶破坏音效 + 紫水晶破坏粒子。 */
+    private fun spawnCoreBreak() {
+        val level = level()
+        var pos = earth.posNow
+        if (pos == Vec3.ZERO) pos = position().add(0.0, bbHeight / 2.0, 0.0)
+        for (k in 0 until 40) {
+            spawnParticle(
+                level, AMETHYST_BREAK,
+                pos.x + (random.nextDouble() - 0.5) * 2.0,
+                pos.y + (random.nextDouble() - 0.5) * 2.0,
+                pos.z + (random.nextDouble() - 0.5) * 2.0,
+                (random.nextDouble() - 0.5) * 0.4, random.nextDouble() * 0.4, (random.nextDouble() - 0.5) * 0.4
+            )
+        }
+        level.playSound(null, blockPosition(), SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.HOSTILE, 2.0F, 1.0F)
+    }
+
+    /** 演出终幕：生成掉落物（大环核心物品）+ 经验球，然后移除实体。 */
+    private fun finishDeath() {
+        if (level().isClientSide) return
+        val level = level() as ServerLevel
+        val dropPos = position().add(0.0, bbHeight / 2.0, 0.0)
+        // 战利品：必定掉落 1 个大环核心
+        val item = ItemEntity(level, dropPos.x, dropPos.y, dropPos.z, ItemStack(HexMobItems.UR_CIRCLE_CORE.get()))
+        item.setDeltaMovement((random.nextDouble() - 0.5) * 0.3, random.nextDouble() * 0.3, (random.nextDouble() - 0.5) * 0.3)
+        level.addFreshEntity(item)
+        // 经验球（Boss 奖励）
+        ExperienceOrb.award(level, dropPos, getExperienceReward())
+        remove(Entity.RemovalReason.KILLED)
+    }
+
+    /** 在"满足 canUse 的技能"里按权重随机抽一个（权重越高越常被选中）；没有可用技能返回 null。 */
+    private fun pickWeightedSkill(): UrCircleSkill? {
+        val usable = skills.filter { it.canUse(this) }
+        if (usable.isEmpty()) return null
+        val total = usable.sumOf { it.weight }
+        if (total <= 0) return usable.random()
+        var r = random.nextInt(total)
+        for (s in usable) {
+            r -= s.weight
+            if (r < 0) return s
+        }
+        return usable.last()
+    }
+    /** 蓄力粒子：位置/类型/速度/数量全部由技能定义，越接近完成越密集。
+     *  客户端与服务端都会调用：客户端本地 addParticle；服务端 spawnParticle 发包广播。 */
+    private fun spawnChannelParticles(skill: UrCircleSkill) {
+        val progress = (stateTicks.toFloat() / skill.channelTicks).coerceIn(0.0F, 1.0F)
+        val count = skill.channelParticlesPerPulse(this) + (progress * 16).toInt()
+        val type = skill.channelParticleType(this)
+        for (k in 0 until count) {
+            val pos = skill.channelParticlePos(this)
+            val vel = skill.channelParticleVelocity(this, pos)
+            spawnParticle(level(), type, pos.x, pos.y, pos.z, vel.x, vel.y, vel.z)
         }
     }
     override fun addAdditionalSaveData(nbt: CompoundTag) {
@@ -368,8 +720,10 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     }
     override fun readAdditionalSaveData(compound: CompoundTag) {
+        // 读档恢复血量走 setHealth，需放行
+        internalHealthWrite = true
         super.readAdditionalSaveData(compound)
-
+        internalHealthWrite = false
     }
     override fun getAllParts(): List<UrCirclePart> {
         return buildList {
@@ -379,7 +733,9 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         }
     }
     override fun shouldRecord(): Boolean = isAlive
-    override fun addEffect(effectInstance: MobEffectInstance, entity: Entity?): Boolean = false
+    override fun addEffect(effectInstance: MobEffectInstance, entity: Entity?): Boolean =
+        // 只放行发光效果（光炮吟唱自发光用），其余状态免疫
+        if (effectInstance.effect == MobEffects.GLOWING) super.addEffect(effectInstance, entity) else false
     override fun canRide(vehicle: Entity): Boolean = false
     override fun canChangeDimensions(): Boolean = false
     override fun isPickable(): Boolean = false
@@ -388,16 +744,188 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     /** 大环的"拒绝引用"事故：3 秒失明 + 自然文案。 */
     override fun createFlickeringMishap(entity: net.minecraft.world.entity.Entity): Mishap = UrCircleFlickerMishap(this)
-    /** 被打立刻还击：把（直接/间接）攻击者设为当前目标——凋灵式 HurtByTarget 行为。 */
+    /** 被打立刻还击：把（直接/间接）攻击者设为当前目标——凋灵式 HurtByTarget 行为；
+     *  吟唱（CHANNELING）/光束（BEAM）期间受伤委托给当前技能控制。
+     *  整个服务端受击流程包裹 internalHealthWrite，让随后的扣血 setHealth 得以通过（见 setHealth 免疫规则）。 */
     override fun hurt(source: DamageSource, amount: Float): Boolean {
+        // 单次受击伤害上限：超过 [MAX_HIT_DAMAGE] 的部分削掉，不进入结算（吟唱委托同样走封顶后的值）
+        val capped = amount.coerceAtMost(MAX_HIT_DAMAGE)
         if (!level().isClientSide) {
+            if (circleState == CircleState.DYING) return false // 死亡演出：不再受伤
             val attacker = source.entity
+            if (attacker === this) return false // 自身来源的伤害（如自爆）直接免疫，不结算
             if (attacker is LivingEntity && attacker !== this && attacker.isAlive) {
                 target = attacker
+                addToHated(attacker)
             }
+            if (source.`is`(HexDamageTypes.OVERCAST)) return false // 忽略过度施法（反向施法）伤害
+            internalHealthWrite = true
         }
-        return super.hurt(source, amount)
+        return try {
+            if (!level().isClientSide) {
+                // 保护状态（血量>90% 且仍有下属存活）：不受任何伤害
+                if (isProtected()) {
+                    return false
+                }
+                val active = when (circleState) {
+                    CircleState.CHANNELING -> currentSkill
+                    CircleState.BEAM -> beamSkill
+                    else -> null
+                }
+                if (active != null) {
+                    return active.onChannelHurt(this, source, capped)
+                }
+            }
+            super.hurt(source, capped)
+        } finally {
+            internalHealthWrite = false
+        }
     }
+
+    /** 免疫击退：任何来源的击退都忽略。 */
+    override fun knockback(strength: Double, x: Double, z: Double) {}
+
+    /** 免疫外部 setHealth：只允许自身伤害流程（internalHealthWrite）或出生/读档窗口（tickCount<=1）写血；
+     *  其他来源直接 setHealth（回血/改血/锁血）一律忽略。
+     *  注意：1.20.1 LivingEntity 构造时 health 字段初始为 1.0F（非 0），所以出生判断用 tickCount 而不是 health==0。 */
+    override fun setHealth(health: Float) {
+        if (internalHealthWrite || tickCount <= 1) {
+            super.setHealth(health)
+        }
+    }
+
+    /** 受击音效：暂用石板被破坏的音效（改这里即可换）。 */
+    override fun getHurtSound(source: DamageSource): SoundEvent =
+        HexBlocks.SLATE.defaultBlockState().getSoundType().getBreakSound()
+
+    /** 吟唱被技能允许时实际施加伤害（直接走父类 hurt，避免再次进入 CHANNELING 控制分支造成死循环）。 */
+    fun applyChannelDamage(source: DamageSource, amount: Float): Boolean = super.hurt(source, amount)
+
+    /** 打断当前吟唱/光束：回到巡航并进入技能冷却。 */
+    fun interruptChannel() {
+        when (circleState) {
+            CircleState.CHANNELING -> { currentSkill = null }
+            CircleState.BEAM -> { beamSkill = null }
+            else -> return
+        }
+        circleState = CircleState.CRUISE
+        stateTicks = 0
+        skillCooldown = SKILL_COOLDOWN
+    }
+
+    /** 进入光束状态（cast() 调用）：由 beamSkill 的 onBeamTick 驱动后续。 */
+    fun beginBeam(skill: UrCircleSkill) {
+        beamSkill = skill
+        circleState = CircleState.BEAM
+        stateTicks = 0
+    }
+
+    /** 光束起点：核心（earth）位置，未就位时退回大环中心。 */
+    fun beamOrigin(): Vec3 {
+        val e = earth.posNow
+        return if (e == Vec3.ZERO) position().add(0.0, bbHeight / 2.0, 0.0) else e
+    }
+
+    /** 存活下属数量（64 格内、本大环召唤、还活着的恼鬼下属）。仅服务端。 */
+    fun livingServants(): Int {
+        if (level().isClientSide) return 0
+        return level().getEntitiesOfClass(UrCircleServant::class.java, AABB(blockPosition()).inflate(64.0)) {
+            it.isAlive && it.getOwner() === this
+        }.size
+    }
+
+    /** 保护状态：血量 >90% 且仍有下属存活 → 大环停转、不动、不受伤害。（死亡演出期间不适用） */
+    fun isProtected(): Boolean =
+        circleState != CircleState.DYING && health / maxHealth > PROTECT_HEALTH_RATIO && livingServants() > 0
+
+    // ---- 仇恨实体列表（多目标） ----
+
+    /** 加入仇恨列表：非敌对、存活、在 [HATE_RANGE] 内、尚未记录。 */
+    fun addToHated(entity: LivingEntity) {
+        if (level().isClientSide) return
+        if (entity === this || entity is Enemy || !entity.isAlive) return
+        if (entity !in hatedTargets && distanceToSqr(entity) <= HATE_RANGE * HATE_RANGE) {
+            hatedTargets.add(entity)
+        }
+    }
+
+    /** 当前有效仇恨目标（存活、未移除、非敌对、在 [HATE_RANGE] 内）。 */
+    fun currentHated(): List<LivingEntity> =
+        hatedTargets.filter { it.isAlive && !it.isRemoved && it !is Enemy && distanceToSqr(it) <= HATE_RANGE * HATE_RANGE }
+
+    /**
+     * 目标优先级排序（多目标时）：**最优先攻击玩家**，其次攻击**剩余生命值最高**的实体。
+     * 返回排好序的列表（第一个是最优先目标）。
+     */
+    fun preferredTargets(entities: Collection<LivingEntity>): List<LivingEntity> =
+        entities.sortedWith(
+            compareByDescending<LivingEntity> { it is Player }
+                .thenByDescending { it.health }
+        )
+
+    /** 下属死亡惩罚：每击败一个下属，大环受 [SERVANT_DEATH_DAMAGE] 直伤（绕过保护，直接内写血量）。 */
+    fun onServantKilled() {
+        if (level().isClientSide || !isAlive || circleState == CircleState.DYING) return
+        internalHealthWrite = true
+        try {
+            setHealth(health - SERVANT_DEATH_DAMAGE)
+        } finally {
+            internalHealthWrite = false
+        }
+        if (health <= 0.0F) {
+            die(level().damageSources().generic())
+        }
+    }
+
+    /** 恢复自身状态：大环自身技能回血用，直接内写血量（受 setHealth 钳制到 maxHealth）。 */
+    fun healSelf(amount: Float) {
+        if (level().isClientSide || !isAlive || circleState == CircleState.DYING) return
+        internalHealthWrite = true
+        try {
+            setHealth(health + amount)
+        } finally {
+            internalHealthWrite = false
+        }
+    }
+
+    /** 反向过度施法：玩家在附近施法（每次 CastingEnvironment 创建）调此积累反噬值。
+     *  达到 [BACKLASH_THRESHOLD] 立刻报复（免吟唱），然后清空重算。 */
+    fun accumulateBacklash(player: ServerPlayer) {
+        if (level().isClientSide) return
+        if (isProtected()) return // 保护期间（下属挡着）：不额外报复
+        if (tickCount - lastBacklashTick < BACKLASH_TICK_INTERVAL) return // 节流：约每秒最多一次
+        lastBacklashTick = tickCount
+        backlash += 1
+        if (backlash >= BACKLASH_THRESHOLD) {
+            backlash = 0
+            retaliate(player)
+        }
+    }
+
+    /** 报复：大环粒子示警 + 音效，然后丢事故（60%）或直接上 debuff（40%）给施法者。 */
+    private fun retaliate(player: ServerPlayer) {
+        val origin = position().add(0.0, bbHeight / 2.0, 0.0)
+        for (k in 0 until 20) {
+            spawnParticle(
+                level(), ParticleTypes.PORTAL,
+                origin.x + (random.nextDouble() - 0.5) * 8.0,
+                origin.y + (random.nextDouble() - 0.5) * 4.0,
+                origin.z + (random.nextDouble() - 0.5) * 8.0,
+                0.0, 0.0, 0.0
+            )
+        }
+        level().playSound(null, blockPosition(), HexSounds.CAST_FAILURE, SoundSource.HOSTILE, 1.6F, 1.0F)
+        if (random.nextFloat() < 0.6F) {
+            UrCircleMishap.throwAt(player, UrCircleStatusTable.randomMishap(this, random))
+        } else {
+            val debuff = UrCircleStatusTable.randomDebuff(random)
+            player.addEffect(MobEffectInstance(debuff.effect, debuff.duration, debuff.amplifier))
+            player.sendSystemMessage(
+                Component.translatableWithFallback("hexmob.backlash.message", "大环的过度施法反噬向你袭来！")
+            )
+        }
+    }
+
     override fun recreateFromPacket(packet: ClientboundAddEntityPacket) {
         super.recreateFromPacket(packet)
         val parts: List<UrCirclePart> = getAllParts()
@@ -417,6 +945,9 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val EARTH_ROTATION: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
         val STATE: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
         val STATE_TICKS: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
+        /** 吟唱"可打断技能"时置真：驱动赤道/黄道面绕各自半径轴旋转的动画。 */
+        val TUMBLING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.BOOLEAN)
+        val RING_SPINNING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.BOOLEAN)
         const val CONTACT_DAMAGE = 6.0F
         const val CONTACT_COOLDOWN = 20
         const val FIRE_INTERVAL = 50
@@ -431,6 +962,50 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val GROUND_CRATER_COOLDOWN = 40
         const val AMBIENT_SOUND_INTERVAL = 100
         const val BOSS_BAR_RANGE = 128.0
+        const val SKILL_COOLDOWN = 100
+        const val CHANNEL_PARTICLE_INTERVAL = 4
+        const val PROTECT_HEALTH_RATIO = 0.9F
+        /** 反向过度施法：玩家距大环多近施法才积累反噬（格）。 */
+        const val BACKLASH_RANGE = 32.0
+        /** 反向过度施法：积累多少点反噬触发一次报复。 */
+        const val BACKLASH_THRESHOLD = 5
+        /** 反向过度施法：两次积累的最小间隔（tick，防同一施法被多次计数）。 */
+        const val BACKLASH_TICK_INTERVAL = 2
+        /** 仇恨实体列表有效距离（格），超出即遗忘。 */
+        const val HATE_RANGE = 32.0
+        /** 下属死亡对大环的反噬直伤（每击败一个下属扣这么多血）。 */
+        const val SERVANT_DEATH_DAMAGE = 5.0F
+        /** 可打断技能吟唱时，赤道/黄道面绕各自半径轴旋转的角速度（度/tick）。 */
+        const val CHANNEL_TUMBLE_SPEED = 5.0F
+        /** 大环单次受到的伤害上限（格外的伤害被削掉，不进入结算）。 */
+        const val MAX_HIT_DAMAGE = 35.0F
+        // ---- 死亡演出时序（参考末影龙）----
+        /** 死亡演出总部件数（内圈促动石 14 + 外圈石板 12；核心单独处理）。 */
+        const val TOTAL_PARTS = 26
+        /** 转速加速段（tick）：0..SPIN_UP 从 1 倍加到 3 倍。 */
+        const val SPIN_UP_TICKS = 30
+        /** 转速减速段终点（tick）：此后转速为 0（3→0 缓停）。 */
+        const val SPIN_DOWN_END = 90
+        /** 部件开始逐个熄灭的 tick。 */
+        const val EXTINGUISH_START = 40
+        /** 每两个部件熄灭的间隔（tick）。 */
+        const val EXTINGUISH_STAGGER = 2
+        /** 部件开始逐个消失的 tick（全部熄灭之后）。 */
+        const val VANISH_START = 100
+        /** 每两个部件消失的间隔（tick）。 */
+        const val VANISH_STAGGER = 3
+        /** 核心毁灭的 tick。 */
+        const val CORE_BREAK_TICK = 185
+        /** 演出结束（掉落+移除）的 tick。 */
+        const val DEATH_END_TICK = 195
+        /** 部件消失粒子：石板用石板方块破坏粒子。 */
+        val SLATE_BREAK = BlockParticleOption(ParticleTypes.BLOCK, HexBlocks.SLATE.defaultBlockState())
+        /** 部件消失粒子：促动石用石头破坏粒子。 */
+        val STONE_BREAK = BlockParticleOption(ParticleTypes.BLOCK, Blocks.STONE.defaultBlockState())
+        /** 核心毁灭粒子：紫水晶破坏粒子。 */
+        val AMETHYST_BREAK = BlockParticleOption(ParticleTypes.BLOCK, Blocks.AMETHYST_BLOCK.defaultBlockState())
+        /** 环刃风暴的部件/半径最大放大倍率（满吟唱时）。 */
+        const val RING_SPIN_MAX_SCALE = 6.0F
         fun registerAttributes(): AttributeSupplier.Builder = createMobAttributes().add(Attributes.MAX_HEALTH, 500.0).add(Attributes.ARMOR, 20.0).add(Attributes.ARMOR_TOUGHNESS, 10.0)
     }
 }

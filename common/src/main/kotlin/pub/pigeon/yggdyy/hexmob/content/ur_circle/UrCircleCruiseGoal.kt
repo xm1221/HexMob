@@ -14,7 +14,8 @@ import kotlin.math.sqrt
  */
 class UrCircleCruiseGoal(private val circle: UrCircleEntity) : Goal() {
 
-    override fun canUse(): Boolean = circle.circleState == CircleState.CRUISE
+    override fun canUse(): Boolean =
+        circle.circleState == CircleState.CRUISE && !circle.isProtected()
 
     override fun canContinueToUse(): Boolean = canUse()
 
@@ -28,8 +29,15 @@ class UrCircleCruiseGoal(private val circle: UrCircleEntity) : Goal() {
         }
         val mc = circle.moveControl
         if (mc is UrCircleMoveControl) {
-            mc.setWantedPosition(wanted.x, wanted.y, wanted.z, 1.0)
+            mc.setWantedPosition(wanted.x, clampHeight(wanted.y), wanted.z, 1.0)
         }
+    }
+
+    /** 不倾向飞太高：把目标高度限制在出生点上方 [FLY_CEILING] 之内。 */
+    private fun clampHeight(wantedY: Double): Double {
+        val home = circle.homePos ?: return wantedY
+        val cap = home.y + FLY_CEILING
+        return if (wantedY > cap) cap else wantedY
     }
 
     /** 凋灵式环绕：太远逼近、太近拉远、中距环绕；悬在目标斜上方 + 垂直浮动。 */
@@ -74,5 +82,7 @@ class UrCircleCruiseGoal(private val circle: UrCircleEntity) : Goal() {
         const val APPROACH_RANGE = 16.0
         /** 小于此水平距离就拉远。 */
         const val BACK_OFF_RANGE = 6.0
+        /** 巡航最高飞行高度：出生点上方（格）——大环不倾向于飞得太高。 */
+        const val FLY_CEILING = 16.0
     }
 }

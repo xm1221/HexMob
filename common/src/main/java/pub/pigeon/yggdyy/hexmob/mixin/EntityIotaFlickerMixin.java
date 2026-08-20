@@ -1,5 +1,6 @@
 package pub.pigeon.yggdyy.hexmob.mixin;
 
+import at.petrak.hexcasting.api.casting.OperatorUtils;
 import at.petrak.hexcasting.api.casting.iota.EntityIota;
 import at.petrak.hexcasting.api.casting.iota.Iota;
 import net.minecraft.world.entity.Entity;
@@ -28,7 +29,7 @@ import java.util.List;
  * hence {@code remap = false}. The facade class of {@code ActionUtils.kt} is
  * named {@code OperatorUtils} via {@code @file:JvmName}.
  */
-@Mixin(targets = "at.petrak.hexcasting.api.casting.OperatorUtils")
+@Mixin(OperatorUtils.class)
 public abstract class EntityIotaFlickerMixin {
     @Inject(method = "getEntity", at = @At("HEAD"), cancellable = true, remap = false)
     private static void hexmob$flickerEntityIota(List<Iota> list, int idx, int argc,

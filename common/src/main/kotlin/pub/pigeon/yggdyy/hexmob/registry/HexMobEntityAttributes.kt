@@ -9,6 +9,7 @@ import pub.pigeon.yggdyy.hexmob.content.amethyst_silverfish.AmethystSilverfishEn
 import pub.pigeon.yggdyy.hexmob.content.crying_amethyst.CryingAmethystEntity
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedPatternEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.servant.UrCircleServant
 
 object HexMobEntityAttributes {
     fun init() {
@@ -16,6 +17,7 @@ object HexMobEntityAttributes {
         EntityAttributeRegistry.register(HexMobEntities.CRYING_AMETHYST) { CryingAmethystEntity.registerAttributes() }
         EntityAttributeRegistry.register(HexMobEntities.AMETHYST_SILVERFISH) {AmethystSilverfishEntity.registerAttributes()}
         EntityAttributeRegistry.register(HexMobEntities.UR_CIRCLE) {UrCircleEntity.registerAttributes()}
+        EntityAttributeRegistry.register(HexMobEntities.UR_CIRCLE_SERVANT) {UrCircleServant.registerAttributes()}
         EntityAttributeRegistry.register(HexMobEntities.IOTA_SHEEP) { hexCastingAttributes(Sheep.createAttributes()) }
         EntityAttributeRegistry.register(HexMobEntities.QUENCH_ALLAY) { hexCastingAttributes(Allay.createAttributes()) }
     }

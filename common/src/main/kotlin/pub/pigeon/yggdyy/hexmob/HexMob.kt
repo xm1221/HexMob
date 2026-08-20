@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Logger
 import pub.pigeon.yggdyy.hexmob.config.HexMobServerConfig
 import pub.pigeon.yggdyy.hexmob.content.iota_sheep.IotaSheepDefaultBehaviors
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedSlateBlock
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.HexMobBacklash
 import pub.pigeon.yggdyy.hexmob.networking.HexMobNetworking
 import pub.pigeon.yggdyy.hexmob.registry.*
 
@@ -33,6 +34,8 @@ object HexMob {
         HexMobEntitySpawns.init()
         IotaSheepDefaultBehaviors.init()
         CastingEnvironment.addCreateEventListener{env, data -> StimulatedSlateBlock.applyMediaDiscount(env, data)}
+        // 反向过度施法：玩家每施法一次给附近大环积累反噬值（第 5 步）
+        CastingEnvironment.addCreateEventListener{env, _ -> HexMobBacklash.onCast(env)}
     }
     fun initServer() {
         HexMobServerConfig.initServer()

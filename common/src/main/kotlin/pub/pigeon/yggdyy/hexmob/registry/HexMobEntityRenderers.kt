@@ -9,6 +9,8 @@ import pub.pigeon.yggdyy.hexmob.content.quench_allay.QuenchAllayRenderer
 import pub.pigeon.yggdyy.hexmob.content.stimulated_pattern.StimulatedPatternEntityRenderer
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleRenderer
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.renderers.SlateProjectileRenderer
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.serpent.UrCircleSerpentRenderer
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.servant.UrCircleServantRenderer
 
 object HexMobEntityRenderers {
     fun init() {
@@ -20,5 +22,7 @@ object HexMobEntityRenderers {
         EntityRendererRegistry.register(HexMobEntities.IOTA_SHEEP) { context -> IotaSheepRenderer(context) }
         EntityRendererRegistry.register(HexMobEntities.QUENCH_ALLAY) { context -> QuenchAllayRenderer(context) }
         EntityRendererRegistry.register(HexMobEntities.SLATE_PROJECTILE) { context -> SlateProjectileRenderer(context) }
+        EntityRendererRegistry.register(HexMobEntities.UR_CIRCLE_SERPENT) { context -> UrCircleSerpentRenderer(context) }
+        EntityRendererRegistry.register(HexMobEntities.UR_CIRCLE_SERVANT) { context -> UrCircleServantRenderer(context) }
     }
 }

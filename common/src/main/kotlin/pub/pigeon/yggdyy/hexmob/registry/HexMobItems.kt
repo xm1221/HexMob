@@ -6,6 +6,7 @@ import net.minecraft.core.registries.Registries
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.SpawnEggItem
 import pub.pigeon.yggdyy.hexmob.HexMob
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleCoreItem
 
 object HexMobItems {
     fun init() {
@@ -35,5 +36,9 @@ object HexMobItems {
             WHITE,            // bright spots
             Item.Properties(),
         )
+    }
+    /** 大环核心：Boss 战利品（备用物品类，见 UrCircleCoreItem）。 */
+    val UR_CIRCLE_CORE: DeferredSupplier<UrCircleCoreItem> = ITEMS.register("ur_circle_core") {
+        UrCircleCoreItem(Item.Properties())
     }
 }
