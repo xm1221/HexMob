@@ -8,8 +8,8 @@
     {
       "type": "patchouli:crafting",
       "recipe": "hexmob:everything_in_now",
-      "text": "hexmob.book.everything.0"
+      "text": "hexmob.book.hexmob.everything.0"
     },
-    "hexmob.book.everything.1"
+    "hexmob.book.hexmob.everything.1"
   ]
 }
