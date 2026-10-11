@@ -105,7 +105,10 @@ dependencies {
     }
 
     modImplementation("software.bernie.geckolib:geckolib-forge-1.20.1:4.8.2")
-    modImplementation("com.eliotlash.mclib:mclib:20")
+    // mclib is a plain library, not a Forge mod. It must sit on Forge's game
+    // module path (forgeRuntimeLibrary) or GeckoLib JsonUtil NCDEs IValue.
+    forgeRuntimeLibrary("com.eliotlash.mclib:mclib:20")
+    include("com.eliotlash.mclib:mclib:20")
 }
 
 tasks {

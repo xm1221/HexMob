@@ -183,7 +183,7 @@ class EverythingInNowItem(properties: Properties) : ItemMediaHolder(properties) 
          *  粉/碎片/充能紫水晶的值读 hexmod 服务端配置（[at.petrak.hexcasting.api.mod.HexConfig.common]，
          *  记录在 hexcasting 的 common 配置里），淬灵晶碎片/块为固定单位。
          */
-        val CRYSTALLINE_MEDIA: Map<ResourceLocation, Long> = run {
+        val CRYSTALLINE_MEDIA: Map<ResourceLocation, Long> by lazy {
             val common = at.petrak.hexcasting.api.mod.HexConfig.common()
             mapOf(
                 BuiltInRegistries.ITEM.getKey(HexItems.AMETHYST_DUST) to common.dustMediaAmount(),

@@ -1,8 +1,12 @@
 package pub.pigeon.yggdyy.hexmob.registry
 
+import dev.architectury.core.item.ArchitecturySpawnEggItem
 import dev.architectury.registry.registries.DeferredRegister
 import dev.architectury.registry.registries.DeferredSupplier
+import dev.architectury.registry.registries.RegistrySupplier
 import net.minecraft.core.registries.Registries
+import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.Mob
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.Rarity
 import net.minecraft.world.item.SpawnEggItem
@@ -28,48 +32,30 @@ object HexMobItems {
 
     private val ITEMS: DeferredRegister<Item> = DeferredRegister.create(HexMob.MODID, Registries.ITEM)
 
-    // Note: HexMobEntities.init() must run BEFORE HexMobItems.init() so these
-    // factories can resolve the EntityTypes when they are built.
-    val IOTA_SHEEP_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("iota_sheep_spawn_egg") {
-        SpawnEggItem(
-            HexMobEntities.IOTA_SHEEP.get(),
-            WHITE,            // wool base
-            AMETHYST_PURPLE,  // hex/amethyst spots
-            Item.Properties(),
-        )
-    }
-    val QUENCH_ALLAY_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("quench_allay_spawn_egg") {
-        SpawnEggItem(
-            HexMobEntities.QUENCH_ALLAY.get(),
-            ALLAY_CYAN,       // allay cyan base
-            WHITE,            // bright spots
-            Item.Properties(),
-        )
-    }
-    val GUARD_ARCHER_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("guard_archer_spawn_egg") {
-        SpawnEggItem(
-            HexMobEntities.GUARD_ARCHER.get(),
-            GUARD_ARCHER_BASE,
-            GUARD_ARCHER_SPOT,
-            Item.Properties(),
-        )
-    }
-    val GUARD_BRUTE_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("guard_brute_spawn_egg") {
-        SpawnEggItem(
-            HexMobEntities.GUARD_BRUTE.get(),
-            GUARD_BRUTE_BASE,
-            GUARD_BRUTE_SPOT,
-            Item.Properties(),
-        )
-    }
-    val GUARD_GOLEM_SPAWN_EGG: DeferredSupplier<SpawnEggItem> = ITEMS.register("guard_golem_spawn_egg") {
-        SpawnEggItem(
-            HexMobEntities.GUARD_GOLEM.get(),
-            GUARD_GOLEM_BASE,
-            GUARD_GOLEM_SPOT,
-            Item.Properties(),
-        )
-    }
+    // Forge registers ITEM before ENTITY_TYPE, so spawn eggs must take a
+    // RegistrySupplier (ArchitecturySpawnEggItem) instead of EntityType.get().
+    val IOTA_SHEEP_SPAWN_EGG: DeferredSupplier<SpawnEggItem> =
+        ITEMS.register("iota_sheep_spawn_egg") { spawnEgg(HexMobEntities.IOTA_SHEEP, WHITE, AMETHYST_PURPLE) }
+    val QUENCH_ALLAY_SPAWN_EGG: DeferredSupplier<SpawnEggItem> =
+        ITEMS.register("quench_allay_spawn_egg") { spawnEgg(HexMobEntities.QUENCH_ALLAY, ALLAY_CYAN, WHITE) }
+    val GUARD_ARCHER_SPAWN_EGG: DeferredSupplier<SpawnEggItem> =
+        ITEMS.register("guard_archer_spawn_egg") { spawnEgg(HexMobEntities.GUARD_ARCHER, GUARD_ARCHER_BASE, GUARD_ARCHER_SPOT) }
+    val GUARD_BRUTE_SPAWN_EGG: DeferredSupplier<SpawnEggItem> =
+        ITEMS.register("guard_brute_spawn_egg") { spawnEgg(HexMobEntities.GUARD_BRUTE, GUARD_BRUTE_BASE, GUARD_BRUTE_SPOT) }
+    val GUARD_GOLEM_SPAWN_EGG: DeferredSupplier<SpawnEggItem> =
+        ITEMS.register("guard_golem_spawn_egg") { spawnEgg(HexMobEntities.GUARD_GOLEM, GUARD_GOLEM_BASE, GUARD_GOLEM_SPOT) }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : Mob> spawnEgg(
+        type: DeferredSupplier<EntityType<T>>,
+        background: Int,
+        highlight: Int,
+    ): ArchitecturySpawnEggItem = ArchitecturySpawnEggItem(
+        type as RegistrySupplier<out EntityType<out Mob>>,
+        background,
+        highlight,
+        Item.Properties(),
+    )
     /** 大环核心：Boss 战利品（备用物品类，见 UrCircleCoreItem）。 */
     val UR_CIRCLE_CORE: DeferredSupplier<UrCircleCoreItem> = ITEMS.register("ur_circle_core") {
         UrCircleCoreItem(Item.Properties().rarity(Rarity.UNCOMMON))

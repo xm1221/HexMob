@@ -9,10 +9,10 @@ import net.minecraft.world.entity.Entity
 import net.minecraftforge.common.capabilities.Capability
 import net.minecraftforge.common.capabilities.ICapabilityProvider
 import net.minecraftforge.common.util.LazyOptional
+import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.event.AttachCapabilitiesEvent
 import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.api.entity.IotaEntity
-import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
 /**
  * Forge hook: attaches Hex Casting's `HexCapabilities.IOTA` capability to every
@@ -23,7 +23,7 @@ object HexMobCapabilities {
     private val IOTA_STORAGE_CAP: ResourceLocation = HexMob.id("iota_storage")
 
     fun init() {
-        MOD_BUS.addListener(this::attachEntityCaps)
+        MinecraftForge.EVENT_BUS.addGenericListener(Entity::class.java, this::attachEntityCaps)
     }
 
     private fun attachEntityCaps(event: AttachCapabilitiesEvent<Entity>) {

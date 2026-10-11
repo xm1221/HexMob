@@ -5,7 +5,6 @@ import dev.architectury.registry.level.entity.SpawnPlacementsRegistry
 import net.minecraft.core.registries.Registries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.tags.TagKey
-import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.entity.SpawnPlacements
@@ -83,14 +82,15 @@ object HexMobEntitySpawns {
 
         // 出生点规则：自然生成的先决条件。
         // 判定无条件通过 → 白天/夜晚/任意亮度/任意方块都刷（守卫不烧不惧光）。
+        // Forge 在 CONSTRUCT 时 DeferredRegister 尚未 freeze，必须传 supplier，不能 .get()。
         var placementProbeLogged = false
         listOf(
-            HexMobEntities.GUARD_ARCHER.get(),
-            HexMobEntities.GUARD_BRUTE.get(),
-            HexMobEntities.GUARD_GOLEM.get(),
+            HexMobEntities.GUARD_ARCHER,
+            HexMobEntities.GUARD_BRUTE,
+            HexMobEntities.GUARD_GOLEM,
         ).forEach { type ->
             SpawnPlacementsRegistry.register(
-                { type },
+                { type.get() },
                 SpawnPlacements.Type.ON_GROUND,
                 Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 SpawnPlacements.SpawnPredicate { _, _, _, _, _ ->

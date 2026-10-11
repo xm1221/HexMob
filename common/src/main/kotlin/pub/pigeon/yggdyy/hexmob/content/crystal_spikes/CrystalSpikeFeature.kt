@@ -1,9 +1,9 @@
 package pub.pigeon.yggdyy.hexmob.content.crystal_spikes
 
 import at.petrak.hexcasting.common.lib.HexBlocks
+import dev.architectury.registry.registries.DeferredRegister
+import dev.architectury.registry.registries.DeferredSupplier
 import net.minecraft.core.BlockPos
-import net.minecraft.core.Registry
-import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.registries.Registries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.tags.TagKey
@@ -250,9 +250,14 @@ class CrystalSpikeFeature : Feature<NoneFeatureConfiguration>(NoneFeatureConfigu
     }
 }
 
-/** 世界生成 feature 注册：必须在 datapack 加载前把 feature 类注册进 BuiltInRegistries.FEATURE。 */
+/** 世界生成 feature 注册：Forge 冻结 BuiltInRegistries，必须走 DeferredRegister。 */
 object HexMobFeatures {
+    private val FEATURES: DeferredRegister<Feature<*>> =
+        DeferredRegister.create(HexMob.MODID, Registries.FEATURE)
+    val CRYSTAL_SPIKE: DeferredSupplier<Feature<*>> =
+        FEATURES.register("crystal_spike") { CrystalSpikeFeature() }
+
     fun init() {
-        Registry.register(BuiltInRegistries.FEATURE, HexMob.id("crystal_spike"), CrystalSpikeFeature())
+        FEATURES.register()
     }
 }
