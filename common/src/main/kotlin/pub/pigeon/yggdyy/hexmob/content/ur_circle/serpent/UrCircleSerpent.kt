@@ -18,6 +18,8 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
 import pub.pigeon.yggdyy.hexmob.util.spawnParticle
 import java.util.UUID
 import kotlin.math.sin
@@ -53,8 +55,13 @@ class UrCircleSerpent(entityType: EntityType<out Entity>, level: Level) : Entity
         return if (d.lengthSqr() < 1.0E-6) Vec3(0.0, 0.0, 1.0) else d.normalize()
     }
 
+    var visualScale: Float
+        get() = entityData.get(SCALE)
+        set(value) = entityData.set(SCALE, value.coerceIn(0.5F, 4.0F))
+
     override fun defineSynchedData() {
         entityData.define(AIM, Vector3f(0F, 0F, 1F))
+        entityData.define(SCALE, 1.0F)
     }
 
     override fun tick() {
@@ -91,7 +98,7 @@ class UrCircleSerpent(entityType: EntityType<out Entity>, level: Level) : Entity
         val head = position()
         val box = AABB(head, head).inflate(1.2)
         for (victim in level().getEntitiesOfClass(LivingEntity::class.java, box)) {
-            //if (victim is Enemy) continue
+            if (victim === owner || isUrCircleAlly(victim)) continue
             if (contactCooldowns.containsKey(victim.uuid)) continue
             if (victim.hurt(level().damageSources().mobAttack(owner), CONTACT_DAMAGE)) {
                 contactCooldowns[victim.uuid] = CONTACT_COOLDOWN
@@ -99,15 +106,15 @@ class UrCircleSerpent(entityType: EntityType<out Entity>, level: Level) : Entity
         }
     }
 
-    /** 石板块 BLOCK 粒子：蛇头每 tick，蛇身每隔 2 tick。 */
     private fun spawnBlockParticles() {
         val state = HexBlocks.SLATE_BLOCK.defaultBlockState()
         val opt = BlockParticleOption(ParticleTypes.BLOCK, state)
         val p = position()
-        spawnParticle(level(), opt, p.x, p.y, p.z, 0.0, 0.1, 0.0)
+        spawnParticle(level(), opt, p.x, p.y, p.z, 0.0, 0.1, 0.0, UrCircleHexVfx.DEFAULT_RANGE)
+        UrCircleHexVfx.spawnConjure(level(), UrCircleHexVfx.MEDIA_PURPLE, p.x, p.y, p.z, 0.0, 0.06, 0.0)
         if (tickCount % 2 == 0 && trail.size > 2) {
             val body = trail[trail.size / 2]
-            spawnParticle(level(), opt, body.x, body.y, body.z, 0.0, 0.0, 0.0)
+            spawnParticle(level(), opt, body.x, body.y, body.z, 0.0, 0.0, 0.0, UrCircleHexVfx.DEFAULT_RANGE)
         }
     }
 
@@ -119,6 +126,8 @@ class UrCircleSerpent(entityType: EntityType<out Entity>, level: Level) : Entity
     companion object {
         private val AIM: EntityDataAccessor<Vector3f> =
             SynchedEntityData.defineId(UrCircleSerpent::class.java, EntityDataSerializers.VECTOR3)
+        private val SCALE: EntityDataAccessor<Float> =
+            SynchedEntityData.defineId(UrCircleSerpent::class.java, EntityDataSerializers.FLOAT)
         private val UP = Vec3(0.0, 1.0, 0.0)
         const val SPEED = 0.7
         const val SWAY_AMPLITUDE = 1.2

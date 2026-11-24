@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.monster.Enemy
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 import pub.pigeon.yggdyy.hexmob.util.spawnParticle
 
@@ -92,7 +93,8 @@ object BeamTicker {
             val steps = (len * 2).toInt().coerceIn(6, 32)
             for (i in 0 until steps) {
                 val along = origin.add(dir.scale(len * i / steps))
-                spawnParticle(level, ParticleTypes.ENCHANT, along.x, along.y, along.z, 0.0, 0.0, 0.0)
+                UrCircleHexVfx.spawnConjure(level, UrCircleHexVfx.BEAM_LAVENDER, along.x, along.y, along.z)
+                spawnParticle(level, ParticleTypes.ENCHANT, along.x, along.y, along.z, 0.0, 0.0, 0.0, UrCircleHexVfx.DEFAULT_RANGE)
             }
         }
 

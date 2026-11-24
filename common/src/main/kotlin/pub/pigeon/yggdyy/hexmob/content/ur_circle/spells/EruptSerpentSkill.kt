@@ -1,25 +1,17 @@
 package pub.pigeon.yggdyy.hexmob.content.ur_circle.spells
 
 import at.petrak.hexcasting.common.lib.HexSounds
-import net.minecraft.core.particles.ParticleTypes
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.serpent.UrCircleSerpent
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
-import pub.pigeon.yggdyy.hexmob.util.spawnParticle
 
-/**
- * 【冲天长蛇】Erupting Serpent——**多目标攻击**：对每一个仇恨目标脚底生成促动石长蛇，
- * 从下到上贯穿造成伤害（实体碰撞、不必中——目标跑开就落空）。
- * 不可打断；吟唱期间目标脚底冒"即将上涌"的预兆粒子。
- */
 class EruptSerpentSkill : UrCircleSkill("erupt_serpent", 60) {
 
     override val weight: Int = 3
+    override val waveColor: Int = UrCircleHexVfx.AMETHYST_VIOLET
 
-    /** 不可打断：吟唱不中断。 */
     override fun channelHurtInterrupts(circle: UrCircleEntity): Boolean = false
-
-    /** 吟唱标记目标发光。 */
     override fun channelMarksTarget(circle: UrCircleEntity): Boolean = true
 
     override fun canUse(circle: UrCircleEntity): Boolean {
@@ -27,24 +19,25 @@ class EruptSerpentSkill : UrCircleSkill("erupt_serpent", 60) {
         return circle.currentHated().any { it.isAlive && circle.health / circle.maxHealth > 0.4F }
     }
 
-    override fun channelParticleType(circle: UrCircleEntity) = ParticleTypes.END_ROD
     override fun channelParticlesPerPulse(circle: UrCircleEntity): Int = 14
-    override fun channelPulseSound(circle: UrCircleEntity) = HexSounds.CAST_NORMAL
+    override fun channelPulseSound(circle: UrCircleEntity) = HexSounds.ADD_TO_PATTERN
     override fun channelPulseInterval(circle: UrCircleEntity): Int = 10
 
-    // 吟唱期间：所有仇恨目标脚底持续冒"上涌"的预兆粒子
     override fun onChannelTick(circle: UrCircleEntity) {
         val level = circle.level()
         if (level.isClientSide) return
         for (t in circle.currentHated().take(MAX_TARGETS)) {
             if (!t.isAlive) continue
             for (k in 0 until 3) {
-                spawnParticle(
-                    level, ParticleTypes.END_ROD,
+                UrCircleHexVfx.spawnConjure(
+                    level,
+                    UrCircleHexVfx.AMETHYST_VIOLET,
                     t.x + (circle.random.nextDouble() - 0.5) * 1.4,
-                    t.y - 0.4,
+                    t.y - 0.2,
                     t.z + (circle.random.nextDouble() - 0.5) * 1.4,
-                    (circle.random.nextDouble() - 0.5) * 0.1, 0.35, (circle.random.nextDouble() - 0.5) * 0.1
+                    (circle.random.nextDouble() - 0.5) * 0.1,
+                    0.28,
+                    (circle.random.nextDouble() - 0.5) * 0.1,
                 )
             }
         }
@@ -53,26 +46,24 @@ class EruptSerpentSkill : UrCircleSkill("erupt_serpent", 60) {
     override fun cast(circle: UrCircleEntity) {
         val level = circle.level()
         if (level.isClientSide) return
-        // 多目标：对每个存活仇恨目标脚下放冲天长蛇
+        val serpentScale = if (circle.phase >= 2) 1.5F else 1.0F
         for (t in circle.currentHated().take(MAX_TARGETS)) {
             if (!t.isAlive) continue
             for (i in 0 until ERUPT_PER_TARGET) {
                 val serpent = UrCircleSerpent(HexMobEntities.UR_CIRCLE_SERPENT.get(), level)
                 serpent.owner = circle
-                // 错位小幅散布，贴目标脚下（从地下冒出）
+                serpent.visualScale = serpentScale
                 val ox = (circle.random.nextDouble() - 0.5) * 1.6
                 val oz = (circle.random.nextDouble() - 0.5) * 1.6
                 serpent.setPos(t.x + ox, t.y - 1.0, t.z + oz)
-                serpent.setAim(0.0, 1.0, 0.0) // 竖直向上：从脚下贯到头顶
+                serpent.setAim(0.0, 1.0, 0.0)
                 level.addFreshEntity(serpent)
             }
         }
     }
 
     companion object {
-        /** 最多同时覆盖几个仇恨目标。 */
         const val MAX_TARGETS = 6
-        /** 每个目标脚下放几条冲天长蛇。 */
         const val ERUPT_PER_TARGET = 3
     }
 }

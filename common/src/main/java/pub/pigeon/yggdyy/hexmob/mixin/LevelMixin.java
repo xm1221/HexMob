@@ -23,6 +23,10 @@ public abstract class LevelMixin {
         List<Entity> res = cir.getReturnValue();
         IHMMultipartEntity.Companion.updateInstances();
         IHMMultipartEntity.Companion.getInstances().stream().filter(_e -> _e instanceof Entity e && _e != entity && self == e.level()).forEach(_e -> {
+            AABB partsBox = _e.getPartsBoundingBox();
+            if (partsBox != null && !partsBox.intersects(area)) {
+                return;
+            }
             _e.getAllParts().stream().filter(predicate.and(e -> e instanceof HMEntityPart e1 && e1.shouldInteract() && e1.getBoundingBox().intersects(area))).forEach(res::add);
         });
         cir.setReturnValue(res);
@@ -32,6 +36,10 @@ public abstract class LevelMixin {
         Level self = (Level) ((Object) this);
         IHMMultipartEntity.Companion.updateInstances();
         IHMMultipartEntity.Companion.getInstances().stream().filter(_e -> _e instanceof Entity e && self == e.level()).forEach(_e -> {
+            AABB partsBox = _e.getPartsBoundingBox();
+            if (partsBox != null && !partsBox.intersects(bounds)) {
+                return;
+            }
             _e.getAllParts().forEach(e -> {
                 if(!e.shouldInteract()) {
                     return;

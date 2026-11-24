@@ -6,6 +6,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.projectile.AbstractHurtingProjectile
@@ -27,21 +28,37 @@ class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : Abstrac
     override fun defineSynchedData() {
         super.defineSynchedData()
         entityData.define(PATTERN, HexPattern.fromAngles("", HexDir.EAST).serializeToNBT())
+        entityData.define(SCALE, 1.0F)
     }
 
     var pattern: HexPattern
         get() = HexPattern.fromNBT(entityData.get(PATTERN))
         set(value) = entityData.set(PATTERN, value.serializeToNBT())
 
+    var visualScale: Float
+        get() = entityData.get(SCALE)
+        set(value) = entityData.set(SCALE, value.coerceIn(0.5F, 4.0F))
+
+    override fun tick() {
+        super.tick()
+        if (!level().isClientSide && tickCount % 2 == 0) {
+            UrCircleHexVfx.spawnConjure(level(), UrCircleHexVfx.MEDIA_PURPLE, x, y, z, 0.0, 0.02, 0.0)
+        }
+    }
+
     override fun addAdditionalSaveData(compound: CompoundTag) {
         super.addAdditionalSaveData(compound)
         compound.put(PATTERN_KEY, entityData.get(PATTERN))
+        compound.putFloat(SCALE_KEY, visualScale)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
         super.readAdditionalSaveData(compound)
         if (compound.contains(PATTERN_KEY)) {
             entityData.set(PATTERN, compound.getCompound(PATTERN_KEY))
+        }
+        if (compound.contains(SCALE_KEY)) {
+            visualScale = compound.getFloat(SCALE_KEY)
         }
     }
 
@@ -51,10 +68,14 @@ class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : Abstrac
     /** 石板不燃烧（父类默认 true 会让弹体每 tick 被点燃，产生火焰外观）。 */
     override fun shouldBurn(): Boolean = false
 
+    override fun canHitEntity(target: Entity): Boolean =
+        super.canHitEntity(target) && !(owner is UrCircleEntity && isUrCircleAlly(target))
+
     override fun onHitEntity(result: EntityHitResult) {
         super.onHitEntity(result)
         if (level().isClientSide) return
         val victim = result.entity
+        if (owner is UrCircleEntity && isUrCircleAlly(victim)) return
         val source = if (owner is LivingEntity) level().damageSources().mobAttack(owner as LivingEntity) else level().damageSources().magic()
         if (victim.hurt(source, DAMAGE)) {
             (victim as? LivingEntity)?.knockback(0.5, deltaMovement.x, deltaMovement.z)
@@ -77,6 +98,8 @@ class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : Abstrac
         /** 命中方块时把一部分方块转化为紫水晶/板岩的概率（0~1）。 */
         const val CONVERT_CHANCE = 0.4F
         val PATTERN: EntityDataAccessor<CompoundTag> = SynchedEntityData.defineId(SlateProjectile::class.java, EntityDataSerializers.COMPOUND_TAG)
+        val SCALE: EntityDataAccessor<Float> = SynchedEntityData.defineId(SlateProjectile::class.java, EntityDataSerializers.FLOAT)
         val PATTERN_KEY: String = HexMob.id("pattern").toString()
+        val SCALE_KEY: String = HexMob.id("scale").toString()
     }
 }

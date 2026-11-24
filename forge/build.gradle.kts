@@ -46,14 +46,6 @@ loom {
 
 repositories {
     maven {
-        name = "GeckoLib"
-        url = URI.create("https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/")
-        content {
-            includeGroupByRegex("software\\.bernie.*")
-            includeGroup("com.eliotlash.mclib")
-        }
-    }
-    maven {
         name = "Modrinth"
         url = URI.create("https://api.modrinth.com/maven")
     }
@@ -103,12 +95,6 @@ dependencies {
         localRuntime(it)
         include(it)
     }
-
-    modImplementation("software.bernie.geckolib:geckolib-forge-1.20.1:4.8.2")
-    // mclib is a plain library, not a Forge mod. It must sit on Forge's game
-    // module path (forgeRuntimeLibrary) or GeckoLib JsonUtil NCDEs IValue.
-    forgeRuntimeLibrary("com.eliotlash.mclib:mclib:20")
-    include("com.eliotlash.mclib:mclib:20")
 }
 
 tasks {

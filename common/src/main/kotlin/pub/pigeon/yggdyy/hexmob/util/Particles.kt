@@ -17,7 +17,8 @@ import net.minecraft.world.level.Level
 fun spawnParticle(
     level: Level, type: ParticleOptions,
     x: Double, y: Double, z: Double,
-    vx: Double, vy: Double, vz: Double
+    vx: Double, vy: Double, vz: Double,
+    range: Double = 64.0
 ) {
     if (level.isClientSide) {
         level.addParticle(type, x, y, z, vx, vy, vz)
@@ -29,8 +30,9 @@ fun spawnParticle(
             vx.toFloat(), vy.toFloat(), vz.toFloat(),
             1.0F, 0
         )
+        val maxDistSqr = range * range
         for (p in level.players()) {
-            if (p.distanceToSqr(x, y, z) < 4096.0) { // 64 格内
+            if (p.distanceToSqr(x, y, z) < maxDistSqr) {
                 p.connection.send(packet)
             }
         }

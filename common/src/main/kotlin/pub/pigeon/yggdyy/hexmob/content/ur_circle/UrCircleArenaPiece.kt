@@ -23,11 +23,7 @@ import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 import pub.pigeon.yggdyy.hexmob.registry.HexMobStructurePieceTypes
 
 /**
- * ur_circle 祭坛结构块：放模板方块 + 实体。
- *
- * 实体（沉睡的大环）由模板自带（nbt 资源副本里已给实体加了 hexmob:Dormant 标记），
- * 走 StructureTemplate.placeInWorld 的实体放置逻辑（默认 ignoreEntities=false 会放实体），
- * 因此这里不需要手动读 entityInfoList（1.20.1 里它是 private）。
+ * ur_circle 祭坛结构块：放置祭坛模板方块（忽略模板内实体），并在原点区块生成一只沉睡的大环。
  */
 class UrCircleArenaPiece private constructor(box: BoundingBox) :
     StructurePiece(HexMobStructurePieceTypes.UR_CIRCLE_ARENA.get(), 0, box) {
@@ -65,19 +61,20 @@ class UrCircleArenaPiece private constructor(box: BoundingBox) :
         random: RandomSource,
         box: BoundingBox,
         chunkPos: ChunkPos,
-        pos: BlockPos
+        chunkOrigin: BlockPos
     ) {
         val server = (level.level as? net.minecraft.server.level.ServerLevel)?.server ?: return
         val template = server.structureManager.get(templateId).orElse(null) ?: return
         val settings = StructurePlaceSettings()
             .setRotation(rotation)
             .setMirror(Mirror.NONE)
+            .setBoundingBox(box)
             .addProcessor(BlockIgnoreProcessor.STRUCTURE_BLOCK)
-            .setIgnoreEntities(true) // 模板方块照放，实体不放：模板里有两只大环，代码只放一只
-        template.placeInWorld(level, pos, pos, settings, random, 2)
-        // 老板只在 piece 原点所在 chunk 生成一次：StructurePiece.postProcess 会对每个
-        // 与 box 相交的 chunk 各调用一次，祭坛 11×11 横跨 2×2 chunk，不加门控会叠出 4 只。
-        if (chunkPos.x == SectionPos.blockToSectionCoord(pos.x) && chunkPos.z == SectionPos.blockToSectionCoord(pos.z)) {
+            .setIgnoreEntities(true) // 模板方块照放，实体由 spawnArenaBoss 控制只放一只
+        template.placeInWorld(level, this.pos, this.pos, settings, random, 2)
+        // 只在 piece 原点所在 chunk 生成一次 boss：StructurePiece.postProcess 会对每个
+        // 与 box 相交的 chunk 各调用一次，祭坛横跨 2×2 chunk，不加门控会重复生成。
+        if (chunkPos.x == SectionPos.blockToSectionCoord(this.pos.x) && chunkPos.z == SectionPos.blockToSectionCoord(this.pos.z)) {
             spawnArenaBoss(level)
         }
     }

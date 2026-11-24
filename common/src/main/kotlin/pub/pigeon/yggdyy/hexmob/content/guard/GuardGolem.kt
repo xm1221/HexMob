@@ -2,13 +2,16 @@ package pub.pigeon.yggdyy.hexmob.content.guard
 
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.damagesource.DamageSource
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal
 import net.minecraft.world.entity.ai.goal.RandomStrollGoal
 import net.minecraft.world.entity.animal.IronGolem
 import net.minecraft.world.level.Level
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
 
 /**
  * 板岩傀儡（铁傀儡型）：**直接继承原版 IronGolem**——
@@ -31,10 +34,20 @@ class GuardGolem(type: EntityType<out GuardGolem>, level: Level) : IronGolem(typ
         loadGuardNbt(tag)
     }
 
-    /** 守卫之间互不伤害（板岩兵/弩手/傀儡不会互打）。 */
+    /** 守卫之间与大环体系互不伤害。 */
     override fun hurt(source: DamageSource, amount: Float): Boolean {
         if (isAllyAttack(source)) return false
         return super.hurt(source, amount)
+    }
+
+    /** 阻止原版 IronGolem.doPush 碰到 Enemy（大环）时自动锁敌。 */
+    override fun doPush(entity: Entity) {
+        if (isUrCircleAlly(entity)) return
+        super.doPush(entity)
+    }
+
+    override fun setTarget(target: LivingEntity?) {
+        super.setTarget(if (isUrCircleAlly(target)) null else target)
     }
 
     /** 板岩生物免疫摔落伤害。 */

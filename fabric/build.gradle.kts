@@ -27,14 +27,6 @@ loom {
 
 repositories {
     maven {
-        name = "GeckoLib"
-        url = URI.create("https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/")
-        content {
-            includeGroupByRegex("software\\.bernie.*")
-            includeGroup("com.eliotlash.mclib")
-        }
-    }
-    maven {
         name = "Modrinth"
         url = URI.create("https://api.modrinth.com/maven")
     }
@@ -102,9 +94,6 @@ dependencies {
         exclude(group = "net.fabricmc.fabric-api")
     }
     modImplementation(libs.modMenu)
-
-    modImplementation("software.bernie.geckolib:geckolib-fabric-1.20.1:4.8.2")
-    modImplementation("com.eliotlash.mclib:mclib:20")
 
     // TerraBlender 软依赖（仅编译期）：fabric.mod.json 声明 "terrablender" entrypoint，
     // 只有大包装有 TerraBlender 时才生效；无 TB 的环境（dev/普通 Fabric）不加载该类。

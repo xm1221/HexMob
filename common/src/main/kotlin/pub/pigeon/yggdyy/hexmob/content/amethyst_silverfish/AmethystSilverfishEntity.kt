@@ -22,33 +22,9 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 import pub.pigeon.yggdyy.hexmob.content.akashic_library.AmethystInfestedBlock
-import software.bernie.geckolib.animatable.GeoEntity
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache
-import software.bernie.geckolib.core.animation.AnimatableManager
-import software.bernie.geckolib.core.animation.AnimationController
-import software.bernie.geckolib.core.animation.RawAnimation
-import software.bernie.geckolib.core.`object`.PlayState
-import software.bernie.geckolib.util.GeckoLibUtil
 
-class AmethystSilverfishEntity(entityType: EntityType<out Monster>, level: Level) : GeoEntity, Monster(entityType, level) {
-    private val animatableInstance: AnimatableInstanceCache = GeckoLibUtil.createInstanceCache(this)
-    override fun registerControllers(controllers: AnimatableManager.ControllerRegistrar) {
-        controllers.add(AnimationController(this, "idle") { state ->
-            if (!entityData.get(IS_FIGHTING)) state.setAndContinue(ANI_IDLE)
-            else {
-                state.resetCurrentAnimation()
-                PlayState.STOP
-            }
-        })
-        controllers.add(AnimationController(this, "move") { state ->
-            if (entityData.get(IS_FIGHTING)) state.setAndContinue(ANI_MOVE)
-            else {
-                state.resetCurrentAnimation()
-                PlayState.STOP
-            }
-        })
-    }
-    override fun getAnimatableInstanceCache(): AnimatableInstanceCache = animatableInstance
+class AmethystSilverfishEntity(entityType: EntityType<out Monster>, level: Level) : Monster(entityType, level) {
+    fun isFighting(): Boolean = entityData.get(IS_FIGHTING)
     override fun getAmbientSound(): SoundEvent {
         return SoundEvents.SILVERFISH_AMBIENT
     }
@@ -82,9 +58,7 @@ class AmethystSilverfishEntity(entityType: EntityType<out Monster>, level: Level
         }
     }
     companion object {
-        val ANI_IDLE: RawAnimation = RawAnimation.begin().thenLoop("idle")
-        val ANI_MOVE: RawAnimation = RawAnimation.begin().thenLoop("move")
-        val IS_FIGHTING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(AmethystSilverfishEntity::class.java, EntityDataSerializers.BOOLEAN);
+        val IS_FIGHTING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(AmethystSilverfishEntity::class.java, EntityDataSerializers.BOOLEAN)
         fun registerAttributes(): AttributeSupplier.Builder = createMonsterAttributes().add(Attributes.MAX_HEALTH, 5.0).add(Attributes.ATTACK_DAMAGE, 1.0).add(Attributes.MOVEMENT_SPEED, 0.2)
         class HideIntoBlockGoal(val silverfish: AmethystSilverfishEntity): Goal() {
             override fun canUse(): Boolean = silverfish.random.nextInt(120) == 0 && (silverfish.target == null || !silverfish.target!!.isAlive)

@@ -13,6 +13,8 @@ import net.minecraft.world.entity.ai.goal.target.TargetGoal
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.projectile.Projectile
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.serpent.UrCircleSerpent
 import java.util.UUID
 
 /**
@@ -77,12 +79,14 @@ interface GuardDormant : HexMobGuard {
         if (tag.contains(GuardCore.TAG_SUMMONER)) guardCore.summonerUuid = tag.getUUID(GuardCore.TAG_SUMMONER)
     }
 
-    /** 是否为守卫内部的"友军伤害"（板岩兵/弩手/傀儡互不打；弩箭经弹射物来源也识别）。 */
+    /** 是否为守卫/大环体系内部的友军伤害。 */
     fun isAllyAttack(source: DamageSource): Boolean {
+        val entity = source.entity
         val direct = source.directEntity
-        if (direct === this) return false
-        if (direct is HexMobGuard) return true
-        if (direct is Projectile && (direct.owner as? HexMobGuard)?.let { it !== this } == true) return true
+        if (direct === this || entity === this) return false
+        if (isUrCircleAlly(entity) || isUrCircleAlly(direct)) return true
+        if (direct is Projectile && isUrCircleAlly(direct.owner)) return true
+        if (direct is UrCircleSerpent && isUrCircleAlly(direct.owner)) return true
         return false
     }
 
@@ -131,12 +135,12 @@ class GuardMasterHateGoal(
         val m = master() ?: return null
         // 优先：大环仇恨列表里离自己最近的（就近支援，不追远）
         val nearest = m.currentHated()
-            .filter { it.isAlive && mob.distanceToSqr(it) <= HATE_RANGE_SQ }
+            .filter { it.isAlive && !isUrCircleAlly(it) && mob.distanceToSqr(it) <= HATE_RANGE_SQ }
             .minByOrNull { mob.distanceToSqr(it) }
         if (nearest != null) return nearest
         // 兜底：大环当前主目标（通常也在仇恨列表里，列表空时才走到这）
         val primary = m.target
-        if (primary != null && primary.isAlive && mob.distanceToSqr(primary) <= HATE_RANGE_SQ) {
+        if (primary != null && primary.isAlive && !isUrCircleAlly(primary) && mob.distanceToSqr(primary) <= HATE_RANGE_SQ) {
             return primary
         }
         return null
@@ -153,7 +157,7 @@ class GuardHurtByTargetGoal(
     private val awake: () -> Boolean
 ) : HurtByTargetGoal(mob) {
     override fun canUse(): Boolean =
-        awake() && super.canUse() && mob.lastHurtByMob !is HexMobGuard
+        awake() && super.canUse() && !isUrCircleAlly(mob.lastHurtByMob)
 
     override fun canContinueToUse(): Boolean = awake() && super.canContinueToUse()
 }

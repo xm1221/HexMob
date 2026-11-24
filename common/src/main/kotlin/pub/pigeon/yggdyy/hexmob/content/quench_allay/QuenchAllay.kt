@@ -123,7 +123,7 @@ class QuenchAllay(entityType: EntityType<out QuenchAllay>, level: Level) : Allay
         }
     }
 
-    /** 清空移动目标（备用方法）。 */
+    /** 清空移动目标。 */
     fun clearAllayTarget() {
         this.entityData.set(TARGET, emptyIotaTag())
     }

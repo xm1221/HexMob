@@ -2,13 +2,17 @@ package pub.pigeon.yggdyy.hexmob.content.ur_circle.servant
 
 import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.ai.control.MoveControl
 import net.minecraft.world.entity.monster.Vex
+import net.minecraft.world.entity.projectile.Projectile
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.serpent.UrCircleSerpent
 import kotlin.math.atan2
 
 /**
@@ -26,6 +30,19 @@ class UrCircleServant(entityType: EntityType<out Vex>, level: Level) : Vex(entit
     init {
         // 换用更慢的飞行控制器
         moveControl = ServantMoveControl(this)
+    }
+
+    override fun hurt(source: DamageSource, amount: Float): Boolean {
+        val entity = source.entity
+        val direct = source.directEntity
+        if (isUrCircleAlly(entity) || isUrCircleAlly(direct)) return false
+        if (direct is Projectile && isUrCircleAlly(direct.owner)) return false
+        if (direct is UrCircleSerpent && isUrCircleAlly(direct.owner)) return false
+        return super.hurt(source, amount)
+    }
+
+    override fun setTarget(target: LivingEntity?) {
+        super.setTarget(if (isUrCircleAlly(target)) null else target)
     }
 
     /** 下属死亡：每击败一个下属，给大环造成 5 点直伤（见 UrCircleEntity.onServantKilled）。 */

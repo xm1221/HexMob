@@ -27,7 +27,6 @@ Hex Casting（咒法学）附属模组，加入一批咒术主题的生物、一
 - [Hex Casting](https://www.curseforge.com/minecraft/mc-mods/hexcasting)（必需）
 - [Architectury API](https://www.curseforge.com/minecraft/mc-mods/architectury-api)（必需）
 - [Cloth Config API](https://www.curseforge.com/minecraft/mc-mods/cloth-config)（必需）
-- [GeckoLib](https://www.curseforge.com/minecraft/mc-mods/geckolib)（必需，生物动画）
 - [TerraBlender](https://www.curseforge.com/minecraft/mc-mods/terrablender)（Fabric 端，生成本模组生物群系）
 - Fabric 端另需 Fabric API 与 Fabric Language Kotlin；Forge 端另需 Kotlin for Forge
 
@@ -137,7 +136,6 @@ An addon for Hex Casting that adds a set of hex-themed mobs, a cursed land of cr
 - [Hex Casting](https://www.curseforge.com/minecraft/mc-mods/hexcasting) (required)
 - [Architectury API](https://www.curseforge.com/minecraft/mc-mods/architectury-api) (required)
 - [Cloth Config API](https://www.curseforge.com/minecraft/mc-mods/cloth-config) (required)
-- [GeckoLib](https://www.curseforge.com/minecraft/mc-mods/geckolib) (required, mob animations)
 - [TerraBlender](https://www.curseforge.com/minecraft/mc-mods/terrablender) (Fabric, biome generation)
 - Fabric additionally needs Fabric API and Fabric Language Kotlin; Forge additionally needs Kotlin for Forge
 

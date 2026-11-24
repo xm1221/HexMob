@@ -27,7 +27,8 @@ class SlateProjectileRenderer(val context: EntityRendererProvider.Context) : Ent
         super.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight)
         val model = context.modelManager.getModel(ModelResourceLocation(HexAPI.modLoc("slate"), "energized=true,face=wall,facing=south,waterlogged=false"))
         poseStack.pushPose()
-        poseStack.scale(0.6F, 0.6F, 0.6F)
+        val sc = 0.6F * entity.visualScale
+        poseStack.scale(sc, sc, sc)
         // 让石板正对飞行方向
         val v = entity.deltaMovement
         if (v.lengthSqr() > 1.0E-7) {

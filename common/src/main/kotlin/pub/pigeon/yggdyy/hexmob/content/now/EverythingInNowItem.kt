@@ -132,16 +132,9 @@ class EverythingInNowItem(properties: Properties) : ItemMediaHolder(properties) 
         hand: InteractionHand,
     ): InteractionResult {
         if (target is ServerPlayer && !target.level().isClientSide) {
-            val advancement = target.server.advancements.getAdvancement(HexAPI.modLoc("enlightenment"))
-            val confuse = target.server.advancements.getAdvancement(HexAPI.modLoc("y_u_no_cast_angy"))
-            val init = target.server.advancements.getAdvancement(HexAPI.modLoc("hexcasting:amethyst_dust"))
-            if (advancement != null) {
-                val progress = target.advancements.getOrStartProgress(advancement)
-                for (criteria in progress.remainingCriteria) {
-                    target.advancements.award(init, criteria)
-                    target.advancements.award(confuse, criteria)
-                    target.advancements.award(advancement, criteria)
-                }
+            grantAdvancement(target, HexAPI.modLoc("amethyst_dust"))
+            grantAdvancement(target, HexAPI.modLoc("y_u_no_cast_angy"))
+            if (grantAdvancement(target, HexAPI.modLoc("enlightenment"))) {
                 target.displayClientMessage(
                     Component.translatable("message.hexmob.everything_in_now.enlightened")
                         .withStyle(ChatFormatting.LIGHT_PURPLE), true
@@ -149,6 +142,15 @@ class EverythingInNowItem(properties: Properties) : ItemMediaHolder(properties) 
             }
         }
         return InteractionResult.sidedSuccess(target.level().isClientSide)
+    }
+
+    private fun grantAdvancement(player: ServerPlayer, id: ResourceLocation): Boolean {
+        val advancement = player.server.advancements.getAdvancement(id) ?: return false
+        val progress = player.advancements.getOrStartProgress(advancement)
+        for (criteria in progress.remainingCriteria.toList()) {
+            player.advancements.award(advancement, criteria)
+        }
+        return true
     }
 
 

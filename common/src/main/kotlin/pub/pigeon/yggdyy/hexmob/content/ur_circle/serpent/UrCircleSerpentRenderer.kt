@@ -36,7 +36,7 @@ class UrCircleSerpentRenderer(val context: EntityRendererProvider.Context) : Ent
             poseStack.pushPose()
             // renderSingleBlock 以原点绘制 0..1 单位立方体 → 平移到节中心
             poseStack.translate(rel.x - 0.5, rel.y - 0.5, rel.z - 0.5)
-            val s = if (i == 0) 1.15F else 0.85F
+            val s = (if (i == 0) 1.15F else 0.85F) * entity.visualScale
             poseStack.scale(s, s, s)
             br.renderSingleBlock(state, poseStack, buffer, packedLight, OverlayTexture.NO_OVERLAY)
             poseStack.popPose()

@@ -1,0 +1,72 @@
+{
+  "mappings": {
+    "pub/pigeon/yggdyy/hexmob/mixin/EntityRenderDispatcherMixin": {
+      "renderHitbox": "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;m_114441_(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/GeodeFeatureMixin": {
+      "place": "Lnet/minecraft/world/level/levelgen/feature/GeodeFeature;m_142674_(Lnet/minecraft/world/level/levelgen/feature/FeaturePlaceContext;)Z"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/LevelMixin": {
+      "getEntities(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;": "Lnet/minecraft/world/level/Level;m_6249_(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;",
+      "getEntities(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V": "Lnet/minecraft/world/level/Level;m_260826_(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/MultiNoiseBiomeSourceMixin": {
+      "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;": "Lnet/minecraft/world/level/biome/MultiNoiseBiomeSource;m_203407_(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;",
+      "parameters": "Lnet/minecraft/world/level/biome/MultiNoiseBiomeSource;m_274409_()Lnet/minecraft/world/level/biome/Climate$ParameterList;"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/NoiseBasedChunkGeneratorMixin": {
+      "Lnet/minecraft/world/level/levelgen/SurfaceSystem;buildSurface(Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;ZLnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/NoiseChunk;Lnet/minecraft/world/level/levelgen/SurfaceRules$RuleSource;)V": "Lnet/minecraft/world/level/levelgen/SurfaceSystem;m_224648_(Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;ZLnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/NoiseChunk;Lnet/minecraft/world/level/levelgen/SurfaceRules$RuleSource;)V",
+      "buildSurface(Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;Lnet/minecraft/world/level/levelgen/blending/Blender;)V": "Lnet/minecraft/world/level/levelgen/NoiseBasedChunkGenerator;m_224261_(Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;Lnet/minecraft/world/level/levelgen/blending/Blender;)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/OverworldBiomeBuilderMixin": {
+      "addBiomes": "Lnet/minecraft/world/level/biome/OverworldBiomeBuilder;m_187175_(Ljava/util/function/Consumer;)V",
+      "addSurfaceBiome": "Lnet/minecraft/world/level/biome/OverworldBiomeBuilder;m_187180_(Ljava/util/function/Consumer;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;FLnet/minecraft/resources/ResourceKey;)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/ServerLevelMixin": {
+      "getEntityOrPart": "Lnet/minecraft/server/level/ServerLevel;m_143317_(I)Lnet/minecraft/world/entity/Entity;"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/StrongholdPieces$LibraryAccessor": {
+      "isTall": "f_229587_:Z"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/StrongholdPiecesMixin": {
+      "findAndCreatePieceFactory": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229426_(Ljava/lang/Class;Lnet/minecraft/world/level/levelgen/structure/StructurePieceAccessor;Lnet/minecraft/util/RandomSource;IIILnet/minecraft/core/Direction;I)Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces$StrongholdPiece;",
+      "resetPieces": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229416_()V"
+    }
+  },
+  "data": {
+    "searge": {
+      "pub/pigeon/yggdyy/hexmob/mixin/EntityRenderDispatcherMixin": {
+        "renderHitbox": "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;m_114441_(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/GeodeFeatureMixin": {
+        "place": "Lnet/minecraft/world/level/levelgen/feature/GeodeFeature;m_142674_(Lnet/minecraft/world/level/levelgen/feature/FeaturePlaceContext;)Z"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/LevelMixin": {
+        "getEntities(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;": "Lnet/minecraft/world/level/Level;m_6249_(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;",
+        "getEntities(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V": "Lnet/minecraft/world/level/Level;m_260826_(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/MultiNoiseBiomeSourceMixin": {
+        "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;": "Lnet/minecraft/world/level/biome/MultiNoiseBiomeSource;m_203407_(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;",
+        "parameters": "Lnet/minecraft/world/level/biome/MultiNoiseBiomeSource;m_274409_()Lnet/minecraft/world/level/biome/Climate$ParameterList;"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/NoiseBasedChunkGeneratorMixin": {
+        "Lnet/minecraft/world/level/levelgen/SurfaceSystem;buildSurface(Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;ZLnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/NoiseChunk;Lnet/minecraft/world/level/levelgen/SurfaceRules$RuleSource;)V": "Lnet/minecraft/world/level/levelgen/SurfaceSystem;m_224648_(Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;ZLnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/NoiseChunk;Lnet/minecraft/world/level/levelgen/SurfaceRules$RuleSource;)V",
+        "buildSurface(Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;Lnet/minecraft/world/level/levelgen/blending/Blender;)V": "Lnet/minecraft/world/level/levelgen/NoiseBasedChunkGenerator;m_224261_(Lnet/minecraft/world/level/chunk/ChunkAccess;Lnet/minecraft/world/level/levelgen/WorldGenerationContext;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/biome/BiomeManager;Lnet/minecraft/core/Registry;Lnet/minecraft/world/level/levelgen/blending/Blender;)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/OverworldBiomeBuilderMixin": {
+        "addBiomes": "Lnet/minecraft/world/level/biome/OverworldBiomeBuilder;m_187175_(Ljava/util/function/Consumer;)V",
+        "addSurfaceBiome": "Lnet/minecraft/world/level/biome/OverworldBiomeBuilder;m_187180_(Ljava/util/function/Consumer;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;Lnet/minecraft/world/level/biome/Climate$Parameter;FLnet/minecraft/resources/ResourceKey;)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/ServerLevelMixin": {
+        "getEntityOrPart": "Lnet/minecraft/server/level/ServerLevel;m_143317_(I)Lnet/minecraft/world/entity/Entity;"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/StrongholdPieces$LibraryAccessor": {
+        "isTall": "f_229587_:Z"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/StrongholdPiecesMixin": {
+        "findAndCreatePieceFactory": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229426_(Ljava/lang/Class;Lnet/minecraft/world/level/levelgen/structure/StructurePieceAccessor;Lnet/minecraft/util/RandomSource;IIILnet/minecraft/core/Direction;I)Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces$StrongholdPiece;",
+        "resetPieces": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229416_()V"
+      }
+    }
+  }
+}

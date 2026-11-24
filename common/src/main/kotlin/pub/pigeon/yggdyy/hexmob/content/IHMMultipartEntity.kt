@@ -1,7 +1,10 @@
 package pub.pigeon.yggdyy.hexmob.content
 
+import net.minecraft.world.phys.AABB
+
 interface IHMMultipartEntity<T: HMEntityPart> {
     fun getAllParts(): List<T>
+    fun getPartsBoundingBox(): AABB? = null
     fun shouldRecord(): Boolean
     companion object {
         val instances: MutableSet<IHMMultipartEntity<*>> = mutableSetOf()

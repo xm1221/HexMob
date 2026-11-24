@@ -13,6 +13,13 @@ import net.minecraft.world.phys.Vec3
 class UrCircleMoveControl(private val circle: UrCircleEntity) : MoveControl(circle) {
 
     override fun tick() {
+        val state = circle.circleState
+        if (state == CircleState.CHARGING || state == CircleState.FOLD_GRIND ||
+            state == CircleState.SHORT_CIRCUIT || state == CircleState.PHASE_TRANSITION ||
+            state == CircleState.DYING
+        ) {
+            return
+        }
         if (!hasWanted()) {
             // 无目标点：惯性减速，原地悬停
             circle.setDeltaMovement(circle.deltaMovement.scale(0.8))

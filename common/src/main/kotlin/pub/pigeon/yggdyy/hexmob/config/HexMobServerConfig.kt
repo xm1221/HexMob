@@ -79,11 +79,6 @@ object HexMobServerConfig {
     ) : GlobalData()
     @Config(name = "server")
     class ServerConfig : ConfigData {
-        /*
-        @Tooltip
-        var dummyServerConfigOption: Int = 64
-            private set
-         */
         @Tooltip
         var opTransformStimulatedPatternCost: Long = MediaConstants.DUST_UNIT * 10
         @Tooltip
@@ -94,20 +89,25 @@ object HexMobServerConfig {
         var stimulatedPatternSpawnRate: Double = 0.5
         @Tooltip
         var cryingAmethystSpawnRate: Double = 0.5
-        /** 大环体积倍率（0.25~4.0，默认 1.0 = 现状；渲染/半径/碰撞一致缩放）。 */
+        /** 大环体积倍率（0.25~16.0，默认 4.0；渲染/半径/碰撞一致缩放）。 */
         @Tooltip
         var urCircleScale: Float = 4.0F
+        /** 是否允许大环及石板弹破坏/转化方块（受原版 mobGriefing 游戏规则共同约束）。 */
+        @Tooltip
+        var urCircleTerrainDamage: Boolean = true
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(opTransformStimulatedPatternCost)
             buf.writeDouble(opStimulatedSlateMediaDiscount)
             buf.writeDouble(stimulatedPatternSpawnRate)
             buf.writeFloat(urCircleScale)
+            buf.writeBoolean(urCircleTerrainDamage)
         }
         fun decode(buf: FriendlyByteBuf): ServerConfig {
-            opTransformStimulatedPatternCost = buf.readVarLong()
+            opTransformStimulatedPatternCost = buf.readLong()
             opStimulatedSlateMediaDiscount = buf.readDouble()
             stimulatedPatternSpawnRate = buf.readDouble()
             urCircleScale = buf.readFloat()
+            urCircleTerrainDamage = buf.readBoolean()
             return this
         }
     }

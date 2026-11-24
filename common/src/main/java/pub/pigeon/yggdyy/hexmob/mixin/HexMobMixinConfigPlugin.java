@@ -26,25 +26,33 @@ public class HexMobMixinConfigPlugin implements IMixinConfigPlugin {
     public void onLoad(String mixinPackage) {}
 
     /**
-     * Common mixins.json points at {@code hexmob-common.refmap.json}, which Loom
-     * generates as {@code named:intermediary} ({@code class_310}, {@code method_*}).
-     * That is correct for Fabric, but Forge 1.20.1 runs Minecraft under official/SRG
-     * names. Applying the intermediary refmap rewrites inject owners to Yarn classes
-     * (e.g. {@code net/minecraft/class_310}) and Mixin then rejects them.
+     * Refmap 按「运行期命名环境」三分支选择，而不是按平台二分：
      *
-     * <p>On Forge, load the platform refmap instead. In {@code runClient} that file
-     * is usually absent, so Mixin keeps the mojmap names already in the mixin
-     * bytecode — which match the named Forge dev environment.
+     * <ul>
+     *   <li><b>Fabric（Knot）</b> → {@code hexmob-common.refmap.json}：jar 里这份是 Loom 生成的
+     *       {@code named:intermediary}（{@code class_4766} / {@code method_*}）。</li>
+     *   <li><b>Forge 生产</b> → {@code hexmob-forge-prod.refmap.json}：手写的 {@code named:searge} 表
+     *       （Loom 生成的 SRG 表 + Loom 生成不出来的两个 {@code @Shadow} 项合成）。Forge 生产运行期
+     *       用 SRG 成员名，缺这张表 {@code @Inject} / {@code @Shadow} 找不到目标，
+     *       {@code defaultRequire = 1} 会直接崩启动。</li>
+     *   <li><b>Forge dev（userdev）与未知环境</b> → 空的 {@code hexmob-forge.refmap.json}：
+     *       dev 运行期是 mojmap 名，空表让 Mixin 直接用字节码里的字面名，正好对得上。
+     *       dev classpath 上的 {@code hexmob-common.refmap.json} 是 Fabric intermediary，
+     *       用它会把 owner 改写成 Yarn 类名（{@code class_310}）而失败。</li>
+     * </ul>
+     *
+     * <p>Architectury common 依赖 fabric-loader，所以 {@code Knot.class} 可见 ≠ 在 Fabric 上；
+     * 这里只看 {@code sun.java.command}（启动命令行）：dev 的 launchTarget 是
+     * {@code forgeclientuserdev} / {@code forgeserveruserdev}，生产是 {@code forgeclient} / {@code forgeserver}。
      */
     @Override
     public String getRefMapperConfig() {
-        // Architectury common depends on fabric-loader, so Knot.class being visible
-        // does NOT mean we are on Fabric. sun.java.command is the launch line:
-        // Forge userdev contains "forgeclient" / "fml.forgeVersion"; Fabric Knot does not.
         String cmd = System.getProperty("sun.java.command", "");
-        boolean fabricLaunch = cmd.contains("Knot") || cmd.contains("fabric.loader");
-        if (fabricLaunch) {
+        if (cmd.contains("Knot") || cmd.contains("fabric.loader")) {
             return "hexmob-common.refmap.json";
+        }
+        if ((cmd.contains("forgeclient") || cmd.contains("forgeserver")) && !cmd.contains("userdev")) {
+            return "hexmob-forge-prod.refmap.json";
         }
         return "hexmob-forge.refmap.json";
     }

@@ -7,4 +7,16 @@ import net.minecraft.resources.ResourceLocation
 
 abstract class PartRenderer(val id: ResourceLocation) {
     abstract fun render(part: UrCirclePart, poseStack: PoseStack, buffer: MultiBufferSource, packedLight: Int, partialTick: Float, context: EntityRendererProvider.Context)
+
+    open fun render(
+        part: UrCirclePart,
+        poseStack: PoseStack,
+        buffer: MultiBufferSource,
+        packedLight: Int,
+        partialTick: Float,
+        context: EntityRendererProvider.Context,
+        renderDetails: Boolean,
+    ) {
+        render(part, poseStack, buffer, packedLight, partialTick, context)
+    }
 }
