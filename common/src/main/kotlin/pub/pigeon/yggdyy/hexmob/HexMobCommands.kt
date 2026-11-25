@@ -24,6 +24,7 @@ object HexMobCommands {
         "dive_grind",
         "plane_slice",
         "summon_servants",
+        "celestial_conjunction",
     )
 
     fun init() {
@@ -65,7 +66,7 @@ object HexMobCommands {
                                 Commands.literal("spawn")
                                     .executes { ctx -> spawnDebugCircle(ctx.source, phase = 1) }
                                     .then(
-                                        Commands.argument("phase", IntegerArgumentType.integer(1, 2))
+                                        Commands.argument("phase", IntegerArgumentType.integer(1, 3))
                                             .executes { ctx ->
                                                 val p = IntegerArgumentType.getInteger(ctx, "phase")
                                                 spawnDebugCircle(ctx.source, p)
@@ -83,12 +84,26 @@ object HexMobCommands {
                             .then(
                                 Commands.literal("phase")
                                     .then(
-                                        Commands.argument("value", IntegerArgumentType.integer(1, 2))
+                                        Commands.argument("value", IntegerArgumentType.integer(1, 3))
                                             .executes { ctx ->
                                                 val circle = requireNearestCircle(ctx.source) ?: return@executes 0
                                                 val p = IntegerArgumentType.getInteger(ctx, "value")
                                                 circle.forceSetPhase(p)
                                                 ctx.source.sendSuccess({ Component.literal("大环阶段已切换为 $p") }, true)
+                                                1
+                                            },
+                                    ),
+                            )
+                            .then(
+                                Commands.literal("stability")
+                                    .then(
+                                        Commands.argument("value", IntegerArgumentType.integer(0, 100))
+                                            .executes { ctx ->
+                                                val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                                val st = IntegerArgumentType.getInteger(ctx, "value")
+                                                circle.stability = st
+                                                if (st <= 0) circle.triggerShortCircuit()
+                                                ctx.source.sendSuccess({ Component.literal("大环法阵稳态已设为 ${circle.stability}") }, true)
                                                 1
                                             },
                                     ),

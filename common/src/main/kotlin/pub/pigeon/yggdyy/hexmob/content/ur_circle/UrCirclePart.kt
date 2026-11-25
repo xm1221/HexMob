@@ -25,6 +25,9 @@ abstract class UrCirclePart(
     var globalIndex: Int = -1
     var ringIndex: Int = -1
 
+    /** 是否在二/三阶段展开时作为实体硬碰撞平台承受玩家站立。 */
+    var walkPlatform: Boolean = false
+
     var posNow: Vec3 = Vec3.ZERO
     var posPrev: Vec3 = Vec3.ZERO
     var dirNow = Vec3(0.0, 0.0, 1.0)
@@ -47,6 +50,7 @@ abstract class UrCirclePart(
     override fun readAdditionalSaveData(compound: CompoundTag) {}
     override fun addAdditionalSaveData(compound: CompoundTag) {}
     override fun isPickable(): Boolean = active
+    override fun canBeCollidedWith(): Boolean = active && walkPlatform && parentMob.canStandOnRings()
     override fun getPickResult(): ItemStack? = parentMob.pickResult
     override fun hurt(source: DamageSource, amount: Float): Boolean {
         if (!active || isInvulnerableTo(source)) return false
@@ -71,4 +75,8 @@ abstract class UrCirclePart(
         dirPrev = dirNow
         dirNow = dir
     }
+
+    /** 供客户端与服务端一致读取本 tick 平台位移动量。 */
+    fun tickDeltaPos(): Vec3 =
+        if (posPrev == Vec3.ZERO || posNow == Vec3.ZERO) Vec3.ZERO else posNow.subtract(posPrev)
 }

@@ -15,10 +15,12 @@ import net.minecraft.client.resources.model.BakedModel
 import net.minecraft.client.resources.model.ModelResourceLocation
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.level.block.Blocks
+import pub.pigeon.yggdyy.hexmob.client.UrCircleHudTracker
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.CircleState
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.PartRenderer
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCirclePart
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlatePart
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
 
 class SlateRenderer(id: ResourceLocation) : PartRenderer(id) {
     override fun render(
@@ -46,8 +48,12 @@ class SlateRenderer(id: ResourceLocation) : PartRenderer(id) {
         if (circle.isPartVanishedInDeath(slate)) return
 
         val shortCircuited = circle.circleState == CircleState.SHORT_CIRCUIT
-        val lit = !circle.isPartExtinguishedInDeath(slate) && !shortCircuited
-        val isWaveHead = lit && circle.isActiveWaveNode(slate)
+        val hudEntry = UrCircleHudTracker.getSlateEntry(circle.id, slate.globalIndex)
+        val symType = hudEntry?.let { SlateSymbolType.byId(it.symbolType) } ?: SlateSymbolType.NONE
+        val isSymbolic = symType != SlateSymbolType.NONE
+        val drawPattern = if (isSymbolic) symType.hexPattern else slate.pattern
+        val lit = !circle.isPartExtinguishedInDeath(slate) && !shortCircuited && (hudEntry?.rebounded != true)
+        val isWaveHead = lit && (circle.isActiveWaveNode(slate) || isSymbolic)
         val energized = if (lit) "energized=true" else "energized=false"
         val model: BakedModel = context.modelManager.getModel(
             ModelResourceLocation(HexAPI.modLoc("slate"), "$energized,face=wall,facing=south,waterlogged=false")
@@ -72,9 +78,9 @@ class SlateRenderer(id: ResourceLocation) : PartRenderer(id) {
         if (renderDetails || isWaveHead) {
             poseStack.translate(0.0, 0.0, 0.063)
             when {
-                shortCircuited -> {
+                shortCircuited || hudEntry?.rebounded == true -> {
                     PatternRenderer.renderPattern(
-                        slate.pattern,
+                        drawPattern,
                         poseStack,
                         WorldlyPatternRenderHelpers.WORLDLY_SETTINGS,
                         PatternColors.DIMMED_COLOR,
@@ -82,13 +88,35 @@ class SlateRenderer(id: ResourceLocation) : PartRenderer(id) {
                         512,
                     )
                 }
+                hudEntry?.tamperable == true -> {
+                    val blink = ((circle.tickCount + partialTick) * 0.65F)
+                    val glowCol = if (kotlin.math.sin(blink.toDouble()) > 0.0) 0x55FFFF else 0x1CC8CC
+                    PatternRenderer.renderPattern(
+                        drawPattern,
+                        poseStack,
+                        WorldlyPatternRenderHelpers.WORLDLY_SETTINGS,
+                        PatternColors.glowyStroke(glowCol),
+                        0.0,
+                        512,
+                    )
+                }
+                isSymbolic -> {
+                    PatternRenderer.renderPattern(
+                        drawPattern,
+                        poseStack,
+                        WorldlyPatternRenderHelpers.WORLDLY_SETTINGS,
+                        PatternColors.glowyStroke(symType.normalColor),
+                        0.0,
+                        512,
+                    )
+                }
                 isWaveHead -> {
-                    val angles = slate.pattern.angles
+                    val angles = drawPattern.angles
                     val strokeCount = (circle.channelWaveProgress() * (angles.size + 1)).toInt().coerceIn(0, angles.size)
                     val patToDraw = if (strokeCount < angles.size) {
-                        HexPattern(slate.pattern.startDir, angles.subList(0, strokeCount))
+                        HexPattern(drawPattern.startDir, angles.subList(0, strokeCount))
                     } else {
-                        slate.pattern
+                        drawPattern
                     }
                     PatternRenderer.renderPattern(
                         patToDraw,
@@ -101,7 +129,7 @@ class SlateRenderer(id: ResourceLocation) : PartRenderer(id) {
                 }
                 lit -> {
                     PatternRenderer.renderPattern(
-                        slate.pattern,
+                        drawPattern,
                         poseStack,
                         WorldlyPatternRenderHelpers.WORLDLY_SETTINGS,
                         PatternColors.SLATE_WOBBLY_PURPLE_COLOR,

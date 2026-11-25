@@ -32,9 +32,13 @@ public class FogRendererMixin {
     ) {
         float intensity = UrCircleSkyTracker.getIntensity();
         if (intensity <= 0.005F) return;
-        fogRed = Mth.lerp(intensity, fogRed, 0.105F);
-        fogGreen = Mth.lerp(intensity, fogGreen, 0.042F);
-        fogBlue = Mth.lerp(intensity, fogBlue, 0.215F);
+        float p3 = UrCircleSkyTracker.getPhase3Intensity();
+        float targetR = Mth.lerp(p3, 0.105F, 0.048F);
+        float targetG = Mth.lerp(p3, 0.042F, 0.020F);
+        float targetB = Mth.lerp(p3, 0.215F, 0.115F);
+        fogRed = Mth.lerp(intensity, fogRed, targetR);
+        fogGreen = Mth.lerp(intensity, fogGreen, targetG);
+        fogBlue = Mth.lerp(intensity, fogBlue, targetB);
         RenderSystem.clearColor(fogRed, fogGreen, fogBlue, 0.0F);
     }
 }

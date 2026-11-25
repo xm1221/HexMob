@@ -116,11 +116,49 @@
       "circle": "This pattern seems useful, but I can't use it."
     }
   },
+  "hud": {
+    "hexmob": {
+      "ur_circle": {
+        "state": {
+          "short_circuit": "SHORT CIRCUIT",
+          "exposed": "EXPOSED"
+        },
+        "shield": "SHIELD %s%%",
+        "slate": {
+          "aim": "Aim",
+          "lock": "Lock",
+          "amp": "Amp",
+          "trigger": "Trig",
+          "none": "Rune"
+        },
+        "slate_state": {
+          "shielded": "LOCK",
+          "tamperable": "OPEN!",
+          "rebounded": "HIT"
+        }
+      }
+    }
+  },
+  "tooltip": {
+    "hexmob": {
+      "ur_circle_core": {
+        "mode": "Extract: %s",
+        "hint_use": "Sneak-Use: Deposit offhand / Extract",
+        "hint_slot": "Inventory Right-Click: Cycle form",
+        "tasty": "Condensed ambient media... oddly tasty."
+      }
+    }
+  },
   "message": {
     "hexmob": {
       "everything_in_now": {
         "insufficient_media": "Not enough media.",
         "enlightened": "You have been granted Enlightenment."
+      },
+      "ur_circle_core": {
+        "deposited": "Deposited %s dust of media",
+        "extracted": "Extracted %s",
+        "mode_switched": "Extract form: %s"
       }
     }
   },
@@ -186,7 +224,16 @@
       "guard_archer_spawn_egg": "Slate Crossbowman Spawn Egg",
       "guard_brute_spawn_egg": "Slate Soldier Spawn Egg",
       "guard_golem_spawn_egg": "Slate Golem Spawn Egg",
-      "ur_circle_core": "Ur Circle Core",
+      "ur_circle_core": {
+        "": "Ur Circle Core",
+        "form": {
+          "dust": "Amethyst Dust",
+          "shard": "Amethyst Shard",
+          "charged": "Charged Amethyst",
+          "quenched_shard": "Quenched Allay Shard",
+          "quenched_block": "Quenched Allay Block"
+        }
+      },
       "everything_in_now": "Quenched Media Cube"
     }
   },

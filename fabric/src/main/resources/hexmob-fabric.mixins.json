@@ -6,6 +6,7 @@
   "client": [
   ],
   "mixins": [
+    "FabricXplatImplMixin"
   ],
   "injectors": {
     "defaultRequire": 1

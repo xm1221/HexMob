@@ -69,8 +69,8 @@ class UrCircleRenderer(val context: EntityRendererProvider.Context) : EntityRend
     }
 
     companion object {
-        const val LOD_MID_DISTANCE = 190.0
-        const val LOD_FAR_DISTANCE = 360.0
+        const val LOD_MID_DISTANCE = 260.0
+        const val LOD_FAR_DISTANCE = 480.0
 
         val renderers: MutableList<PartRenderer> = mutableListOf(
             CubeRenderer(HexMob.id("cube")),

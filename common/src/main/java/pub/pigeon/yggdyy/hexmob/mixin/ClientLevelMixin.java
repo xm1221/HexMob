@@ -16,9 +16,13 @@ public class ClientLevelMixin {
         float intensity = UrCircleSkyTracker.getIntensity();
         if (intensity <= 0.005F) return;
         Vec3 base = cir.getReturnValue();
-        double r = Mth.lerp(intensity, base.x, 0.075);
-        double g = Mth.lerp(intensity, base.y, 0.028);
-        double b = Mth.lerp(intensity, base.z, 0.165);
+        float p3 = UrCircleSkyTracker.getPhase3Intensity();
+        double targetR = Mth.lerp(p3, 0.075, 0.032);
+        double targetG = Mth.lerp(p3, 0.028, 0.012);
+        double targetB = Mth.lerp(p3, 0.165, 0.082);
+        double r = Mth.lerp(intensity, base.x, targetR);
+        double g = Mth.lerp(intensity, base.y, targetG);
+        double b = Mth.lerp(intensity, base.z, targetB);
         cir.setReturnValue(new Vec3(r, g, b));
     }
 

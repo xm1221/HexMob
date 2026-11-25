@@ -6,14 +6,15 @@ import pub.pigeon.yggdyy.hexmob.content.ur_circle.SlateProjectile
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlatePart
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 【石板轨道轰炸】几何招式：
- * 吟唱时在目标脚下锁定多处落点并画出紫色/金紫刻度预警圈；
- * 吟唱结束时从外圈石板齐射俯冲石板弹精准轰炸落点。
+ * 【石板轨道轰炸】M1 参数化版：
+ * - 吟唱期派出一枚 Lock 锁敌追踪板环绕目标公转以维持轰炸阵眼；
+ * - 若 Lock 板被打偏超过 11 格或被反噬，轰炸落点将失去追踪并散落偏移！
  */
 class OrbitalBarrageSkill : UrCircleSkill("orbital_barrage", CHANNEL_TICKS) {
     override val weight: Int = 4
@@ -38,14 +39,28 @@ class OrbitalBarrageSkill : UrCircleSkill("orbital_barrage", CHANNEL_TICKS) {
 
     override fun onChannelTick(circle: UrCircleEntity) {
         val level = circle.level()
-        if (circle.stateTicks == 1 || strikeZones.isEmpty()) {
+        val t = circle.target ?: return
+        val lockOrbAng = circle.tickCount * 0.16
+        val lockAnchor = Vec3(t.x + cos(lockOrbAng) * 4.5, t.y + 2.8, t.z + sin(lockOrbAng) * 4.5)
+        var lockSlate = circle.findSymbolicSlate(SlateSymbolType.LOCK)
+        if (circle.stateTicks == 1 || lockSlate == null) {
+            lockSlate = circle.deploySymbolicSlate(SlateSymbolType.LOCK, lockAnchor)
+        }
+        if (lockSlate != null && !lockSlate.detached && !lockSlate.rebounded) {
+            lockSlate.deployedPos = lockAnchor
+        }
+
+        val trackingBroken = lockSlate != null && (lockSlate.rebounded ||
+            (lockSlate.detached && lockSlate.posNow.distanceTo(t.position()) > 11.0))
+
+        if (circle.stateTicks == 1 || strikeZones.isEmpty() || (circle.stateTicks % 15 == 0 && trackingBroken)) {
             strikeZones.clear()
-            val t = circle.target ?: return
             val count = if (circle.phase >= 2) STRIKE_COUNT_PHASE2 else STRIKE_COUNT_PHASE1
+            val centerRef = if (trackingBroken && lockSlate != null) lockSlate.posNow else t.position()
             for (i in 0 until count) {
                 val ang = Math.PI * 2.0 * i / count + circle.random.nextDouble() * 0.4
-                val r = if (i == 0) 0.5 else 2.5 + circle.random.nextDouble() * 5.0
-                strikeZones.add(Vec3(t.x + cos(ang) * r, t.y, t.z + sin(ang) * r))
+                val r = if (trackingBroken) 10.0 + circle.random.nextDouble() * 12.0 else (if (i == 0) 0.5 else 2.5 + circle.random.nextDouble() * 5.0)
+                strikeZones.add(Vec3(centerRef.x + cos(ang) * r, t.y, centerRef.z + sin(ang) * r))
             }
         }
         if (circle.stateTicks % 4 == 0) {
@@ -54,7 +69,7 @@ class OrbitalBarrageSkill : UrCircleSkill("orbital_barrage", CHANNEL_TICKS) {
                     level,
                     zone,
                     radius = 2.2,
-                    color = UrCircleHexVfx.AMETHYST_VIOLET,
+                    color = if (trackingBroken) UrCircleHexVfx.SIPHON_CYAN else UrCircleHexVfx.AMETHYST_VIOLET,
                     points = 14,
                 )
             }

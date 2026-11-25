@@ -56,9 +56,9 @@ object HexMobItems {
         highlight,
         Item.Properties(),
     )
-    /** 大环核心：Boss 战利品（备用物品类，见 UrCircleCoreItem）。 */
+    /** 大环核心：Boss 战利品（quenched-media-cube 后勤终极解）。 */
     val UR_CIRCLE_CORE: DeferredSupplier<UrCircleCoreItem> = ITEMS.register("ur_circle_core") {
-        UrCircleCoreItem(Item.Properties().rarity(Rarity.UNCOMMON))
+        UrCircleCoreItem(Item.Properties().stacksTo(1).rarity(Rarity.EPIC))
     }
     /** 淬灵媒质立方：随"当下"流转的装饰性物品，材质随世界时间循环换 3 帧（hexmob:phase）。 */
     val EVERYTHING_IN_NOW: DeferredSupplier<Item> = ITEMS.register("everything_in_now") {

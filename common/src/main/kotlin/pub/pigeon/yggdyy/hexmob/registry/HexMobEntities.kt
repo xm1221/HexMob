@@ -49,7 +49,7 @@ object HexMobEntities {
         EntityType.Builder.of(
             {type, level -> UrCircleEntity(type, level)},
             MobCategory.MISC
-        ).sized(10F, 6F).clientTrackingRange(24).build("ur_circle")
+        ).sized(10F, 6F).clientTrackingRange(32).build("ur_circle")
     }
     val IOTA_SHEEP: DeferredSupplier<EntityType<IotaSheepEntity>> = ENTITIES.register("iota_sheep") {
         EntityType.Builder.of(

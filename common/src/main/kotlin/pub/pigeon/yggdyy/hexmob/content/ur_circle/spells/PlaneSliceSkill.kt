@@ -9,15 +9,15 @@ import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 【环面切割】二阶段几何大招：
- * 沿巨型环的几何平面发射 360° 旋转高能媒质光刃带。
- * 吟唱期间沿切割平面放出预警光环，释放时仅命中"垂直距离该平面 ≤2.2 格且在环半径范围内"的生物，
- * 鼓励玩家利用跳跃/下潜或高低地形穿出切割平面。
+ * 【环面切割】M1 参数化版：
+ * 吟唱时部署 Aim 板标定斩切平面高度与斜度，并部署 Amp 板增幅；
+ * 推动 Aim 板上下偏移会真实改变环面光刃的切割高度。
  */
 class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
     override val weight: Int = 4
@@ -44,21 +44,25 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
     }
 
     override fun onChannelTick(circle: UrCircleEntity) {
+        val center = circle.beamOrigin()
         val t = circle.target
-        if (circle.stateTicks == 1 || t != null && t.isAlive) {
-            val center = circle.beamOrigin()
-            val targetCenter = t?.position()?.add(0.0, t.bbHeight / 2.0, 0.0) ?: center.add(1.0, 0.0, 0.0)
-            // 使平面穿过目标附近且保持微倾斜，留出明确可躲避的上下空间
-            val toTarget = targetCenter.subtract(center)
-            val horiz = Vec3(toTarget.x, 0.0, toTarget.z)
-            val right = if (horiz.lengthSqr() > 1.0E-4) horiz.cross(Vec3(0.0, 1.0, 0.0)).normalize() else Vec3(1.0, 0.0, 0.0)
-            val dirToTarget = if (toTarget.lengthSqr() > 1.0E-4) toTarget.normalize() else Vec3(0.0, 0.0, 1.0)
-            planeOrigin = Vec3(center.x, targetCenter.y + 0.4, center.z)
-            planeNormal = dirToTarget.cross(right).normalize()
-            planeAxisU = right
-            planeAxisV = planeNormal.cross(planeAxisU).normalize()
-            planeRadius = circle.ringOuterRadius().coerceAtLeast(24.0)
+        val targetCenter = t?.position()?.add(0.0, t.bbHeight / 2.0, 0.0) ?: center.add(1.0, 0.0, 0.0)
+        var aim = circle.findSymbolicSlate(SlateSymbolType.AIM)
+        if (circle.stateTicks <= 1 || aim == null) {
+            aim = circle.deploySymbolicSlate(SlateSymbolType.AIM, Vec3(targetCenter.x, targetCenter.y + 0.4, targetCenter.z))
+            circle.deploySymbolicSlate(SlateSymbolType.AMP, null, preferredRing = 0)
         }
+        val anchorPos = aim?.posNow?.takeIf { it != Vec3.ZERO } ?: targetCenter
+        val toTarget = anchorPos.subtract(center)
+        val horiz = Vec3(toTarget.x, 0.0, toTarget.z)
+        val right = if (horiz.lengthSqr() > 1.0E-4) horiz.cross(Vec3(0.0, 1.0, 0.0)).normalize() else Vec3(1.0, 0.0, 0.0)
+        val dirToTarget = if (toTarget.lengthSqr() > 1.0E-4) toTarget.normalize() else Vec3(0.0, 0.0, 1.0)
+        planeOrigin = Vec3(center.x, anchorPos.y, center.z)
+        planeNormal = dirToTarget.cross(right).normalize()
+        planeAxisU = right
+        planeAxisV = planeNormal.cross(planeAxisU).normalize()
+        planeRadius = circle.ringOuterRadius().coerceAtLeast(24.0)
+
         if (circle.stateTicks % 4 == 0) {
             emitPlaneRing(circle, UrCircleHexVfx.BEAM_LAVENDER, points = 32)
         }
@@ -87,7 +91,6 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
         val progress = (circle.stateTicks.toFloat() / SLICE_DURATION).coerceIn(0F, 1F)
         val sweepAngle = progress * Math.PI * 2.0
 
-        // 绘制两条对向扫过的光刃射线与环缘光带
         val bladeDir = planeAxisU.scale(cos(sweepAngle)).add(planeAxisV.scale(sin(sweepAngle))).normalize()
         UrCircleHexVfx.spawnRingArc(
             level,
@@ -100,6 +103,7 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
             emitPlaneRing(circle, UrCircleHexVfx.WAVE_GOLD, points = 36)
         }
 
+        val dmg = SLICE_DAMAGE * circle.ampDamageMultiplier()
         if (circle.stateTicks % DAMAGE_INTERVAL == 0) {
             val box = AABB(planeOrigin, planeOrigin).inflate(planeRadius + 2.0)
             for (victim in level.getEntitiesOfClass(LivingEntity::class.java, box)) {
@@ -109,7 +113,7 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
                 val perpDist = abs(rel.dot(planeNormal))
                 val inPlaneSq = rel.lengthSqr() - perpDist * perpDist
                 if (perpDist <= SLICE_HALF_THICKNESS && inPlaneSq <= (planeRadius + 1.5) * (planeRadius + 1.5)) {
-                    victim.hurt(level.damageSources().mobAttack(circle), SLICE_DAMAGE)
+                    victim.hurt(level.damageSources().mobAttack(circle), dmg)
                 }
             }
         }

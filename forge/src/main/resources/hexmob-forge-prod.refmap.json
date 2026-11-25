@@ -1,7 +1,17 @@
 {
   "mappings": {
+    "pub/pigeon/yggdyy/hexmob/mixin/BossHealthOverlayMixin": {
+      "drawBar(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280106_(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/ClientLevelMixin": {
+      "getCloudColor": "Lnet/minecraft/client/multiplayer/ClientLevel;m_104808_(F)Lnet/minecraft/world/phys/Vec3;",
+      "getSkyColor": "Lnet/minecraft/client/multiplayer/ClientLevel;m_171660_(Lnet/minecraft/world/phys/Vec3;F)Lnet/minecraft/world/phys/Vec3;"
+    },
     "pub/pigeon/yggdyy/hexmob/mixin/EntityRenderDispatcherMixin": {
       "renderHitbox": "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;m_114441_(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/FogRendererMixin": {
+      "setupColor": "Lnet/minecraft/client/renderer/FogRenderer;m_109018_(Lnet/minecraft/client/Camera;FLnet/minecraft/client/multiplayer/ClientLevel;IF)V"
     },
     "pub/pigeon/yggdyy/hexmob/mixin/GeodeFeatureMixin": {
       "place": "Lnet/minecraft/world/level/levelgen/feature/GeodeFeature;m_142674_(Lnet/minecraft/world/level/levelgen/feature/FeaturePlaceContext;)Z"
@@ -9,6 +19,9 @@
     "pub/pigeon/yggdyy/hexmob/mixin/LevelMixin": {
       "getEntities(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;": "Lnet/minecraft/world/level/Level;m_6249_(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;",
       "getEntities(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V": "Lnet/minecraft/world/level/Level;m_260826_(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V"
+    },
+    "pub/pigeon/yggdyy/hexmob/mixin/LevelRendererMixin": {
+      "renderClouds": "Lnet/minecraft/client/renderer/LevelRenderer;m_253054_(Lcom/mojang/blaze3d/vertex/PoseStack;Lorg/joml/Matrix4f;FDDD)V"
     },
     "pub/pigeon/yggdyy/hexmob/mixin/MultiNoiseBiomeSourceMixin": {
       "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;": "Lnet/minecraft/world/level/biome/MultiNoiseBiomeSource;m_203407_(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;",
@@ -35,8 +48,18 @@
   },
   "data": {
     "searge": {
+      "pub/pigeon/yggdyy/hexmob/mixin/BossHealthOverlayMixin": {
+        "drawBar(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280106_(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/ClientLevelMixin": {
+        "getCloudColor": "Lnet/minecraft/client/multiplayer/ClientLevel;m_104808_(F)Lnet/minecraft/world/phys/Vec3;",
+        "getSkyColor": "Lnet/minecraft/client/multiplayer/ClientLevel;m_171660_(Lnet/minecraft/world/phys/Vec3;F)Lnet/minecraft/world/phys/Vec3;"
+      },
       "pub/pigeon/yggdyy/hexmob/mixin/EntityRenderDispatcherMixin": {
         "renderHitbox": "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;m_114441_(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/FogRendererMixin": {
+        "setupColor": "Lnet/minecraft/client/renderer/FogRenderer;m_109018_(Lnet/minecraft/client/Camera;FLnet/minecraft/client/multiplayer/ClientLevel;IF)V"
       },
       "pub/pigeon/yggdyy/hexmob/mixin/GeodeFeatureMixin": {
         "place": "Lnet/minecraft/world/level/levelgen/feature/GeodeFeature;m_142674_(Lnet/minecraft/world/level/levelgen/feature/FeaturePlaceContext;)Z"
@@ -44,6 +67,9 @@
       "pub/pigeon/yggdyy/hexmob/mixin/LevelMixin": {
         "getEntities(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;": "Lnet/minecraft/world/level/Level;m_6249_(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;",
         "getEntities(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V": "Lnet/minecraft/world/level/Level;m_260826_(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V"
+      },
+      "pub/pigeon/yggdyy/hexmob/mixin/LevelRendererMixin": {
+        "renderClouds": "Lnet/minecraft/client/renderer/LevelRenderer;m_253054_(Lcom/mojang/blaze3d/vertex/PoseStack;Lorg/joml/Matrix4f;FDDD)V"
       },
       "pub/pigeon/yggdyy/hexmob/mixin/MultiNoiseBiomeSourceMixin": {
         "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;": "Lnet/minecraft/world/level/biome/MultiNoiseBiomeSource;m_203407_(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;",

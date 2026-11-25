@@ -6,6 +6,7 @@ import at.petrak.hexcasting.api.casting.math.HexPattern
 import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.CubePart
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.RingPlatformPart
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlatePart
 import pub.pigeon.yggdyy.hexmob.util.rotateDA
 import kotlin.math.abs
@@ -23,6 +24,9 @@ enum class RingKind {
 
 /**
  * 大环的单条旋转环轨：保存静态轨道参数并计算随阶段/合拢/沉睡插值的法线与半径。
+ * - phase 1：仅 INNER_IMPETUS + ECLIPTIC_SLATE 两层紧凑双环；
+ * - phase 2：展开 OUTER_SLATE（中大可登环岩冠）与 POLAR_IMPETUS；
+ * - phase 3：展开 ZENITH_SLATE 与 APEX_IMPETUS 并把外环放大至“覆压周天”山岳全尺寸。
  */
 class RingTrack(
     val kind: RingKind,
@@ -35,11 +39,17 @@ class RingTrack(
     val partScale: Float,
     val unlockPhase: Int,
     val parts: List<UrCirclePart>,
+    val deckParts: List<RingPlatformPart> = emptyList(),
     val faceTangent: Boolean,
     val haloWidth: Float,
+    val phase3RadiusMul: Double = 1.0,
 ) {
-    fun isVisible(phase: Int, phase2Reveal: Float): Boolean =
-        unlockPhase == 1 || (phase >= 2 && phase2Reveal > 0.01F)
+    fun isVisible(phase: Int, phase2Reveal: Float, phase3Reveal: Float = 1.0F): Boolean =
+        when (unlockPhase) {
+            1 -> true
+            2 -> phase >= 2 && phase2Reveal > 0.01F
+            else -> phase >= 3 && phase3Reveal > 0.01F
+        }
 
     fun effectiveNormal(foldProgress: Float, dormantFold: Float): Vec3 {
         val dormantTargetTilt = if (ringIndex % 2 == 0) 48F else -48F
@@ -56,14 +66,16 @@ class RingTrack(
         return normal.cross(ref).normalize()
     }
 
-    fun effectiveRadius(totalScale: Float, dormantFold: Float, phase2Reveal: Float): Double {
+    fun effectiveRadius(totalScale: Float, dormantFold: Float, phase2Reveal: Float, phase3Reveal: Float = 0.0F): Double {
         val dormantShrink = 1.0 - 0.72 * dormantFold.coerceIn(0F, 1F)
         if (unlockPhase == 1) {
             return baseRadius * totalScale * dormantShrink
         }
-        if (phase2Reveal <= 0.01F) return 0.0
-        val reveal = 0.2 + 0.8 * phase2Reveal.coerceIn(0F, 1F)
-        return baseRadius * totalScale * reveal * dormantShrink
+        val revealRaw = if (unlockPhase == 2) phase2Reveal else phase3Reveal
+        if (revealRaw <= 0.01F) return 0.0
+        val reveal = 0.2 + 0.8 * revealRaw.coerceIn(0F, 1F)
+        val p3Mul = 1.0 + (phase3RadiusMul - 1.0) * phase3Reveal.coerceIn(0F, 1F)
+        return baseRadius * p3Mul * totalScale * reveal * dormantShrink
     }
 }
 
@@ -137,6 +149,12 @@ object RingTrackFactory {
                 it.globalIndex = nextGlobal++
             }
         }
+        val eclipticDecks = (0 until 16).map {
+            RingPlatformPart(circle, baseWidth = 2.0F, baseHeight = 0.9F).also {
+                it.ringIndex = 1
+                it.globalIndex = nextGlobal++
+            }
+        }
         val eclipticTrack = RingTrack(
             kind = RingKind.ECLIPTIC_SLATE,
             ringIndex = 1,
@@ -148,6 +166,7 @@ object RingTrackFactory {
             partScale = 2.6F,
             unlockPhase = 1,
             parts = eclipticParts,
+            deckParts = eclipticDecks,
             faceTangent = false,
             haloWidth = 3.8F,
         )
@@ -159,10 +178,16 @@ object RingTrackFactory {
                 it.globalIndex = nextGlobal++
             }
         }
+        val outerDecks = (0 until 36).map {
+            RingPlatformPart(circle, baseWidth = 3.4F, baseHeight = 1.35F).also {
+                it.ringIndex = 2
+                it.globalIndex = nextGlobal++
+            }
+        }
         val outerTrack = RingTrack(
             kind = RingKind.OUTER_SLATE,
             ringIndex = 2,
-            baseRadius = 29.0,
+            baseRadius = 21.5,
             baseTiltDeg = 4F,
             tiltAzimuthDeg = 20F,
             spinDir = 1F,
@@ -170,8 +195,10 @@ object RingTrackFactory {
             partScale = 3.6F,
             unlockPhase = 2,
             parts = outerParts,
+            deckParts = outerDecks,
             faceTangent = false,
             haloWidth = 7.5F,
+            phase3RadiusMul = 1.65,
         )
 
         val polarParts = (0 until 16).map { idx ->
@@ -203,19 +230,26 @@ object RingTrackFactory {
                 it.globalIndex = nextGlobal++
             }
         }
+        val zenithDecks = (0 until 24).map {
+            RingPlatformPart(circle, baseWidth = 2.4F, baseHeight = 1.0F).also {
+                it.ringIndex = 4
+                it.globalIndex = nextGlobal++
+            }
+        }
         val zenithTrack = RingTrack(
             kind = RingKind.ZENITH_SLATE,
             ringIndex = 4,
-            baseRadius = 21.0,
-            baseTiltDeg = 72F,
+            baseRadius = 38.0,
+            baseTiltDeg = 62F,
             tiltAzimuthDeg = -55F,
             spinDir = -1F,
             spinSpeedMul = 0.42F,
             partScale = 3.0F,
-            unlockPhase = 2,
+            unlockPhase = 3,
             parts = zenithParts,
+            deckParts = zenithDecks,
             faceTangent = false,
-            haloWidth = 4.5F,
+            haloWidth = 6.5F,
         )
 
         val apexParts = (0 until 16).map { idx ->
@@ -228,16 +262,16 @@ object RingTrackFactory {
         val apexTrack = RingTrack(
             kind = RingKind.APEX_IMPETUS,
             ringIndex = 5,
-            baseRadius = 25.0,
-            baseTiltDeg = -18F,
+            baseRadius = 46.0,
+            baseTiltDeg = -26F,
             tiltAzimuthDeg = 75F,
             spinDir = -1F,
             spinSpeedMul = 0.28F,
             partScale = 2.5F,
-            unlockPhase = 2,
+            unlockPhase = 3,
             parts = apexParts,
             faceTangent = true,
-            haloWidth = 3.8F,
+            haloWidth = 5.5F,
         )
 
         val earth = CubePart(circle, HexMob.id("cube"), 2F, 2F, HexMob.id("ur_circle_core"), "").also {
@@ -247,7 +281,10 @@ object RingTrackFactory {
 
         val rings = listOf(innerTrack, eclipticTrack, outerTrack, polarTrack, zenithTrack, apexTrack)
         val allParts = buildList {
-            for (ring in rings) addAll(ring.parts)
+            for (ring in rings) {
+                addAll(ring.parts)
+                addAll(ring.deckParts)
+            }
             add(earth)
         }
         return BuiltCircleGeometry(rings, earth, allParts)

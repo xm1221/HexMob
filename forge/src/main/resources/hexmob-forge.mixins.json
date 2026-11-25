@@ -6,6 +6,7 @@
   "client": [
   ],
   "mixins": [
+    "ForgeXplatImplMixin"
   ],
   "injectors": {
     "defaultRequire": 1

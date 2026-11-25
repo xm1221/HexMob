@@ -100,11 +100,49 @@
       "circle": "这个图案似乎有用，但我用不了"
     }
   },
+  "hud": {
+    "hexmob": {
+      "ur_circle": {
+        "state": {
+          "short_circuit": "短路 · 易伤",
+          "exposed": "护盾破除"
+        },
+        "shield": "护盾 %s%%",
+        "slate": {
+          "aim": "瞄准",
+          "lock": "锁敌",
+          "amp": "增幅",
+          "trigger": "触发",
+          "none": "符文"
+        },
+        "slate_state": {
+          "shielded": "护盾",
+          "tamperable": "可改!",
+          "rebounded": "反噬"
+        }
+      }
+    }
+  },
+  "tooltip": {
+    "hexmob": {
+      "ur_circle_core": {
+        "mode": "提取形态：%s",
+        "hint_use": "潜行右键：存入副手媒质 / 空手提取",
+        "hint_slot": "背包右键：切换提取形态",
+        "tasty": "凝缩周天媒质的晶核，意外地可口。"
+      }
+    }
+  },
   "message": {
     "hexmob": {
       "everything_in_now": {
         "insufficient_media": "媒质不足。",
         "enlightened": "你已被授予启迪。"
+      },
+      "ur_circle_core": {
+        "deposited": "已存入 %s 份紫水晶粉媒质",
+        "extracted": "已提取 %s",
+        "mode_switched": "提取形态：%s"
       }
     }
   },
@@ -132,7 +170,16 @@
       "guard_archer_spawn_egg": "板岩弩手刷怪蛋",
       "guard_brute_spawn_egg": "板岩兵刷怪蛋",
       "guard_golem_spawn_egg": "板岩傀儡刷怪蛋",
-      "ur_circle_core": "大环核心",
+      "ur_circle_core": {
+        "": "大环核心",
+        "form": {
+          "dust": "紫水晶粉",
+          "shard": "紫水晶碎片",
+          "charged": "充能紫水晶",
+          "quenched_shard": "淬灵晶碎片",
+          "quenched_block": "淬灵晶块"
+        }
+      },
       "everything_in_now": "淬灵媒质立方"
     }
   },

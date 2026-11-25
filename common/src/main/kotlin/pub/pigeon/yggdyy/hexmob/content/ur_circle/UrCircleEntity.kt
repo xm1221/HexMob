@@ -1,9 +1,12 @@
 package pub.pigeon.yggdyy.hexmob.content.ur_circle
 
+import at.petrak.hexcasting.api.casting.iota.Iota
 import at.petrak.hexcasting.api.casting.mishaps.Mishap
+import at.petrak.hexcasting.api.misc.MediaConstants
 import at.petrak.hexcasting.common.lib.HexBlocks
 import at.petrak.hexcasting.common.lib.HexDamageTypes
 import at.petrak.hexcasting.common.lib.HexSounds
+import at.petrak.hexcasting.xplat.IXplatAbstractions
 import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleTypes
@@ -41,6 +44,7 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.api.entity.FlickeringEntity
+import pub.pigeon.yggdyy.hexmob.client.UrCircleHudTracker
 import pub.pigeon.yggdyy.hexmob.config.HexMobServerConfig
 import pub.pigeon.yggdyy.hexmob.content.IHMMultipartEntity
 import pub.pigeon.yggdyy.hexmob.content.guard.GuardDormant
@@ -49,6 +53,7 @@ import pub.pigeon.yggdyy.hexmob.content.quench_allay.QuenchAllay
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.servant.UrCircleServant
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.AmethystTrapSkill
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.BeamSkill
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.CelestialConjunctionSkill
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.CurseSkill
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.DiveGrindSkill
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.EruptSerpentSkill
@@ -66,7 +71,10 @@ import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.UrCircleSkill
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.UrCircleStatusTable
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.CubePart
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlatePart
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.ur_spell.UrCoreBeamEntity
+import pub.pigeon.yggdyy.hexmob.networking.msg.MsgUrCircleHudS2C
+import pub.pigeon.yggdyy.hexmob.networking.msg.SlateHudEntry
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 import pub.pigeon.yggdyy.hexmob.registry.HexMobItems
 import pub.pigeon.yggdyy.hexmob.util.rotateDA
@@ -120,13 +128,19 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     var phase: Int
         get() = entityData.get(PHASE)
-        set(value) = entityData.set(PHASE, value.coerceIn(1, 2))
+        set(value) = entityData.set(PHASE, value.coerceIn(1, 3))
     var dormantFold: Float
         get() = entityData.get(DORMANT_FOLD)
         set(value) = entityData.set(DORMANT_FOLD, value.coerceIn(0F, 1F))
     var phase2Reveal: Float
         get() = entityData.get(PHASE2_REVEAL)
         set(value) = entityData.set(PHASE2_REVEAL, value.coerceIn(0F, 1F))
+    var phase3Reveal: Float
+        get() = entityData.get(PHASE3_REVEAL)
+        set(value) = entityData.set(PHASE3_REVEAL, value.coerceIn(0F, 1F))
+    var stability: Int
+        get() = entityData.get(STABILITY)
+        set(value) = entityData.set(STABILITY, value.coerceIn(0, MAX_STABILITY))
     var foldProgress: Float
         get() = entityData.get(FOLD_PROGRESS)
         set(value) = entityData.set(FOLD_PROGRESS, value.coerceIn(0F, 1F))
@@ -170,7 +184,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         DiveGrindSkill(),
         PlaneSliceSkill(),
         SummonServantSkill(),
+        CelestialConjunctionSkill(),
     )
+
+    private val activeSymbolicSlates: MutableList<SlatePart> = mutableListOf()
+    private var hudSyncDirty: Boolean = true
+    private var stabilityRegenTimer: Int = 0
 
     private var currentSkill: UrCircleSkill? = null
     var beamSkill: UrCircleSkill? = null
@@ -214,6 +233,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         entityData.define(DORMANT, false)
         entityData.define(DORMANT_FOLD, 0F)
         entityData.define(PHASE2_REVEAL, 0F)
+        entityData.define(PHASE3_REVEAL, 0F)
+        entityData.define(STABILITY, MAX_STABILITY)
         entityData.define(FOLD_PROGRESS, 0F)
         entityData.define(ACTIVE_NODE_A, -1)
         entityData.define(ACTIVE_NODE_B, -1)
@@ -310,16 +331,25 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val scale = totalScale()
         val df = dormantFold
         val p2 = phase2Reveal
+        val p3 = phase3Reveal
         var maxR = 12.0
         for (ring in rings) {
-            if (!ring.isVisible(phase, p2)) continue
-            val r = ring.effectiveRadius(scale, df, p2)
+            if (!ring.isVisible(phase, p2, p3)) continue
+            val r = ring.effectiveRadius(scale, df, p2, p3)
             if (r > maxR) maxR = r
         }
         return maxR
     }
 
-    fun ringInnerRadius(): Double = rings[0].effectiveRadius(totalScale(), dormantFold, phase2Reveal)
+    fun canStandOnRings(): Boolean =
+        !dormant &&
+            phase >= 2 &&
+            phase2Reveal > 0.35F &&
+            circleState != CircleState.SHORT_CIRCUIT &&
+            circleState != CircleState.DYING &&
+            circleState != CircleState.PHASE_TRANSITION
+
+    fun ringInnerRadius(): Double = rings[0].effectiveRadius(totalScale(), dormantFold, phase2Reveal, phase3Reveal)
 
     fun safeFlightDir(desired: Vec3, lookAhead: Double): Vec3? = flightNav.safeFlightDir(desired, lookAhead)
 
@@ -358,11 +388,22 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     fun partVisualScale(part: UrCirclePart): Float {
         if (part === earth) {
-            return totalScale() * (if (phase >= 2) 2.4F else 1.5F)
+            return totalScale() * when {
+                phase >= 3 -> 2.6F
+                phase >= 2 -> 2.1F
+                else -> 1.5F
+            }
+        }
+        if (part is pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.RingPlatformPart) {
+            return totalScale() * 0.9F
         }
         val track = rings.getOrNull(part.ringIndex)
         val mul = track?.partScale ?: 1.0F
-        val nodeBoost = if (isActiveWaveNode(part)) 1.28F else 1.0F
+        val nodeBoost = when {
+            part is SlatePart && part.symbolType != SlateSymbolType.NONE -> if (part.tamperable) 1.38F else 1.24F
+            isActiveWaveNode(part) -> 1.28F
+            else -> 1.0F
+        }
         return totalScale() * mul * nodeBoost
     }
 
@@ -380,10 +421,26 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             if (dormant) return
             phase2Reveal = when {
                 phase < 2 -> 0.0F
-                circleState == CircleState.PHASE_TRANSITION && stateTicks < PHASE_BURST_TICK -> 0.0F
+                circleState == CircleState.PHASE_TRANSITION && phase == 2 && stateTicks < PHASE_BURST_TICK -> 0.0F
                 else -> stepToward(phase2Reveal, 1.0F, 0.032F)
             }
+            phase3Reveal = when {
+                phase < 3 -> 0.0F
+                circleState == CircleState.PHASE_TRANSITION && phase == 3 && stateTicks < PHASE_BURST_TICK -> 0.0F
+                else -> stepToward(phase3Reveal, 1.0F, 0.028F)
+            }
             foldProgress = stepToward(foldProgress, targetFoldProgress, 0.04F)
+
+            if (circleState == CircleState.CRUISE && stability < MAX_STABILITY) {
+                stabilityRegenTimer++
+                if (stabilityRegenTimer >= 30) {
+                    stabilityRegenTimer = 0
+                    stability += 1
+                    hudSyncDirty = true
+                }
+            } else {
+                stabilityRegenTimer = 0
+            }
 
             val base = rotationSpeedFactor()
             val rot = when {
@@ -437,18 +494,21 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val curPhase = phase
         val df = dormantFold
         val p2 = phase2Reveal
+        val p3 = phase3Reveal
         val fp = foldProgress
         val scale = totalScale()
+        val canStand = canStandOnRings()
 
         for (track in rings) {
-            if (!track.isVisible(curPhase, p2)) {
+            if (!track.isVisible(curPhase, p2, p3)) {
                 for (p in track.parts) p.active = false
+                for (d in track.deckParts) d.active = false
                 continue
             }
             val baseN = track.effectiveNormal(fp, df)
             val radAxis = track.radialAxis(baseN)
             val effN = if (tumbling && tumbleDeg != 0.0F) baseN.rotateDA(tumbleDeg, radAxis).normalize() else baseN
-            val rLen = track.effectiveRadius(scale, df, p2)
+            val rLen = track.effectiveRadius(scale, df, p2, p3)
             val baseRot = ringRotation(track.ringIndex)
             val count = track.parts.size
             for (idx in 0 until count) {
@@ -462,8 +522,37 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 } else {
                     if (delta.lengthSqr() > 1.0E-6) delta.normalize() else Vec3(0.0, 0.0, 1.0)
                 }
-                p.changeState(origin.add(delta), face)
+                val nominalPos = origin.add(delta)
+                if (p is SlatePart) {
+                    if (!level().isClientSide && p.symbolType != SlateSymbolType.NONE) {
+                        tickSymbolicSlatePosition(p, nominalPos, face, origin)
+                    } else if (level().isClientSide) {
+                        syncClientSlateFromHud(p, nominalPos, face, origin)
+                    } else {
+                        p.changeState(nominalPos, face)
+                    }
+                } else {
+                    p.changeState(nominalPos, face)
+                }
             }
+
+            val deckCount = track.deckParts.size
+            if (deckCount > 0) {
+                val decksActive = canStand && rLen > 4.0
+                for (idx in 0 until deckCount) {
+                    val deck = track.deckParts[idx]
+                    deck.active = decksActive
+                    if (!decksActive) continue
+                    deck.applyScale(partVisualScale(deck))
+                    val deg = baseRot + (idx.toFloat() / deckCount) * 360F
+                    val delta = radAxis.rotateDA(deg, effN).scale(rLen)
+                    val tangent = effN.cross(delta).let { if (it.lengthSqr() > 1.0E-6) it.normalize() else Vec3(0.0, 0.0, 1.0) }
+                    deck.changeState(origin.add(delta).add(0.0, -0.35 * scale, 0.0), tangent)
+                }
+            }
+        }
+        if (!level().isClientSide && canStand) {
+            UrCircleCarryAlong.applyServerCarryAlong(this)
         }
     }
 
@@ -515,7 +604,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         }
         fireCooldown = (FIRE_INTERVAL / fireRateFactor()).toInt().coerceAtLeast(MIN_FIRE_INTERVAL)
         val volley = (1 + ((currentAnger() - 1.0F) * 1.5F).toInt()).coerceIn(1, MAX_VOLLEY)
-        val sourceRing = if (phase >= 2 && rings[2].isVisible(phase, phase2Reveal)) rings[2].parts else ecliptic
+        val sourceRing = if (phase >= 2 && rings[2].isVisible(phase, phase2Reveal, phase3Reveal)) rings[2].parts else ecliptic
         if (sourceRing.isEmpty()) return
 
         UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), HexSounds.CAST_NORMAL, 1.8F, 1.0F)
@@ -618,11 +707,50 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             be.removeAllPlayers()
             return
         }
+        val prevPlayers = be.players.toList()
         for (player in serverLevel.players()) {
             if (player.distanceToSqr(this) <= BOSS_BAR_RANGE * BOSS_BAR_RANGE) {
                 be.addPlayer(player)
             } else {
                 be.removePlayer(player)
+            }
+        }
+        if (be.players.any { it !in prevPlayers }) {
+            hudSyncDirty = true
+        }
+        syncHudPacketToWatchers(be, serverLevel)
+    }
+
+    private fun syncHudPacketToWatchers(be: ServerBossEvent, serverLevel: ServerLevel) {
+        if (!hudSyncDirty && tickCount % 4 != 0) return
+        hudSyncDirty = false
+        val entries = activeSymbolicSlates.take(4).map { slate ->
+            val hasCustomPos = (slate.deployedPos != null || slate.detached) && slate.posNow != Vec3.ZERO
+            SlateHudEntry(
+                globalIndex = slate.globalIndex,
+                symbolType = slate.symbolType.id,
+                tamperable = slate.tamperable,
+                rebounded = slate.rebounded,
+                progress = slate.skillProgress.coerceIn(0F, 1F),
+                hasCustomPos = hasCustomPos,
+                posX = if (hasCustomPos) slate.posNow.x else 0.0,
+                posY = if (hasCustomPos) slate.posNow.y else 0.0,
+                posZ = if (hasCustomPos) slate.posNow.z else 0.0,
+            )
+        }
+        val pkt = MsgUrCircleHudS2C(
+            entityId = id,
+            bossEventUuid = be.id,
+            phase = phase,
+            circleState = circleState.ordinal,
+            stability = stability,
+            shieldPct = coreShieldPct(),
+            slates = entries,
+        )
+        val maxSq = BOSS_BAR_RANGE * BOSS_BAR_RANGE
+        for (player in serverLevel.players()) {
+            if (player.distanceToSqr(this) <= maxSq) {
+                pkt.sendToPlayer(player)
             }
         }
     }
@@ -819,6 +947,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                     currentSkill = null
                     skillCooldown = SKILL_COOLDOWN
                     if (circleState != CircleState.BEAM && circleState != CircleState.FOLD_GRIND) {
+                        clearAllSymbolicSlates()
                         circleState = CircleState.CRUISE
                     }
                     stateTicks = 0
@@ -871,6 +1000,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                     if (stateTicks >= skill.beamTicks(this)) {
                         skill.onBeamEnd(this)
                         beamSkill = null
+                        clearAllSymbolicSlates()
                         setPlaneSlicing(false, 0.0F)
                         discardCircleBeam()
                         circleState = CircleState.CRUISE
@@ -889,6 +1019,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                     if (stateTicks >= skill.grindTicks(this)) {
                         skill.onGrindEnd(this)
                         grindSkill = null
+                        clearAllSymbolicSlates()
                         targetFoldProgress = 0.0F
                         circleState = CircleState.CRUISE
                         stateTicks = 0
@@ -1010,6 +1141,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             }
         }
         if (stateTicks >= SHORT_CIRCUIT_TICKS) {
+            stability = MAX_STABILITY
+            hudSyncDirty = true
             circleState = CircleState.CRUISE
             stateTicks = 0
         }
@@ -1021,6 +1154,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         currentSkill = null
         beamSkill = null
         grindSkill = null
+        clearAllSymbolicSlates()
         targetFoldProgress = 1.0F
         mediaWave.clear(this)
         setSiphoning(false)
@@ -1029,7 +1163,28 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         discardAnchors()
         circleState = CircleState.PHASE_TRANSITION
         stateTicks = 0
+        hudSyncDirty = true
         UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), SoundEvents.BEACON_POWER_SELECT, 3.0F, 0.65F)
+    }
+
+    fun beginPhase3Transition() {
+        if (phase >= 3 || circleState == CircleState.DYING) return
+        if (phase < 2) phase2Reveal = 1.0F
+        phase = 3
+        currentSkill = null
+        beamSkill = null
+        grindSkill = null
+        clearAllSymbolicSlates()
+        targetFoldProgress = 1.0F
+        mediaWave.clear(this)
+        setSiphoning(false)
+        setPlaneSlicing(false, 0.0F)
+        discardCircleBeam()
+        discardAnchors()
+        circleState = CircleState.PHASE_TRANSITION
+        stateTicks = 0
+        hudSyncDirty = true
+        UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), SoundEvents.BEACON_POWER_SELECT, 3.5F, 0.55F)
     }
 
     fun triggerShortCircuit() {
@@ -1037,6 +1192,9 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         currentSkill = null
         beamSkill = null
         grindSkill = null
+        clearAllSymbolicSlates()
+        stability = 0
+        hudSyncDirty = true
         targetFoldProgress = 0.0F
         mediaWave.clear(this)
         setSiphoning(false)
@@ -1073,8 +1231,327 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             )
         }
 
-        if (phase == 1 && health <= maxHealth * 0.5F) {
+        checkPhaseThresholds()
+    }
+
+    private fun checkPhaseThresholds() {
+        if (!isAlive || health <= 0.0F || circleState == CircleState.DYING) return
+        if (phase < 3 && health <= maxHealth * PHASE3_HP_RATIO) {
+            beginPhase3Transition()
+        } else if (phase < 2 && health <= maxHealth * PHASE2_HP_RATIO) {
             beginPhase2Transition()
+        }
+    }
+
+    // ---- M1 象征石板参数化与有条件篡改闭环 ----
+
+    fun getSymbolicSlates(): List<SlatePart> = activeSymbolicSlates
+
+    fun findSymbolicSlate(type: SlateSymbolType): SlatePart? =
+        activeSymbolicSlates.firstOrNull { it.symbolType == type && it.active }
+
+    fun deploySymbolicSlate(
+        type: SlateSymbolType,
+        targetPos: Vec3? = null,
+        preferredRing: Int = -1,
+    ): SlatePart? {
+        if (type == SlateSymbolType.NONE) return null
+        val ringCandidates = when {
+            preferredRing >= 0 -> listOfNotNull(rings.getOrNull(preferredRing)?.takeIf { it.isVisible(phase, phase2Reveal, phase3Reveal) })
+            phase >= 3 -> listOfNotNull(rings.getOrNull(4), rings.getOrNull(2), rings.getOrNull(1))
+            phase >= 2 -> listOfNotNull(rings.getOrNull(2), rings.getOrNull(1))
+            else -> listOfNotNull(rings.getOrNull(1))
+        }
+        val slate = ringCandidates
+            .flatMap { it.parts }
+            .filterIsInstance<SlatePart>()
+            .firstOrNull { it.active && it.symbolType == SlateSymbolType.NONE }
+            ?: cachedAllParts.filterIsInstance<SlatePart>().firstOrNull { it.active && it.symbolType == SlateSymbolType.NONE }
+            ?: return null
+
+        slate.assignSymbol(type, targetPos)
+        activeSymbolicSlates.add(slate)
+        hudSyncDirty = true
+        return slate
+    }
+
+    fun clearAllSymbolicSlates() {
+        if (activeSymbolicSlates.isEmpty()) return
+        for (s in activeSymbolicSlates) {
+            s.clearSymbol()
+        }
+        activeSymbolicSlates.clear()
+        hudSyncDirty = true
+    }
+
+    fun ampDamageMultiplier(): Float {
+        val amp = activeSymbolicSlates.firstOrNull { it.symbolType == SlateSymbolType.AMP && it.active && !it.rebounded }
+            ?: return 1.0F
+        if (amp.tamperable) return 1.05F
+        val dist = if (amp.posNow == Vec3.ZERO) 15.0 else amp.posNow.distanceTo(beamOrigin())
+        val prox = (1.0 - (dist / (32.0 * totalScale())).coerceIn(0.0, 1.0)).toFloat()
+        return 1.15F + 0.25F * prox
+    }
+
+    fun coreShieldPct(): Int {
+        if (circleState == CircleState.SHORT_CIRCUIT || circleState == CircleState.DYING) return 0
+        val base = when {
+            phase >= 3 -> 45
+            phase >= 2 -> 30
+            else -> 0
+        }
+        val amp = activeSymbolicSlates.firstOrNull {
+            it.symbolType == SlateSymbolType.AMP && it.active && !it.tamperable && !it.rebounded
+        }
+        val ampBonus = if (amp != null) 15 else 0
+        return (base + ampBonus).coerceIn(0, 75)
+    }
+
+    fun reduceStability(delta: Int, triggerInstantly: Boolean = true) {
+        if (level().isClientSide || circleState == CircleState.SHORT_CIRCUIT || circleState == CircleState.DYING) return
+        stability = (stability - delta).coerceIn(0, MAX_STABILITY)
+        hudSyncDirty = true
+        if (triggerInstantly && stability <= 0) {
+            triggerShortCircuit()
+        }
+    }
+
+    private fun tickSymbolicSlatePosition(slate: SlatePart, nominalPos: Vec3, nominalDir: Vec3, origin: Vec3) {
+        slate.deployTicks++
+        val total = (currentSkill?.channelTicks ?: beamSkill?.beamTicks(this) ?: 60).coerceAtLeast(1)
+        slate.skillProgress = (stateTicks.toFloat() / total).coerceIn(0.0F, 1.0F)
+
+        val currentPos = if (slate.posNow == Vec3.ZERO) nominalPos else slate.posNow
+        if (slate.lastNominalPos == Vec3.ZERO) slate.lastNominalPos = nominalPos
+        val orbitVel = nominalPos.subtract(slate.lastNominalPos)
+        slate.lastNominalPos = nominalPos
+        slate.orbitSpeed = orbitVel.length()
+
+        if (slate.slowdownTicks > 0) {
+            slate.slowdownTicks--
+        }
+
+        // 1. 检测玩家施加的外部冲量（OpAddMotion / 物理击退）
+        val ext = slate.deltaMovement
+        if (ext.lengthSqr() > 0.004) {
+            slate.setDeltaMovement(Vec3.ZERO)
+            slate.lastImpulseTick = tickCount
+            val opposing = orbitVel.dot(ext) < -0.015 && orbitVel.add(ext).length() < 0.35
+            if (!slate.tamperable && (opposing || slate.slowdownTicks > 0)) {
+                unlockSlateTamperable(slate, currentPos, orbitVel.add(ext).scale(0.35))
+            } else if (!slate.tamperable && ext.length() >= 0.28) {
+                slate.detached = true
+                slate.detachedPos = currentPos
+                slate.detachedVel = ext.scale(1.35)
+                if (slate.detachedPos.distanceTo(nominalPos) >= 3.5 || slate.detachedPos.distanceTo(origin) >= ringInnerRadius() + 4.0) {
+                    unlockSlateTamperable(slate, slate.detachedPos, slate.detachedVel)
+                }
+            } else if (slate.tamperable && !slate.rebounded) {
+                slate.detached = true
+                if (slate.detachedPos == Vec3.ZERO) slate.detachedPos = currentPos
+                slate.detachedVel = slate.detachedVel.scale(0.35).add(ext.scale(1.65))
+            }
+        }
+
+        // 2. 主动飞出定点瞄准/追踪/触发窗口期：离开核心稳定区后自动切入可篡改态
+        if (!slate.tamperable && !slate.rebounded && slate.deployedPos != null && slate.deployTicks >= 12) {
+            if (slate.symbolType != SlateSymbolType.AMP || currentPos.distanceTo(origin) > ringInnerRadius() + 3.0) {
+                unlockSlateTamperable(slate, currentPos, Vec3.ZERO)
+            }
+        }
+
+        // 3. 计算最终渲染与碰撞坐标
+        val finalPos: Vec3
+        if (slate.detached) {
+            slate.detachedPos = slate.detachedPos.add(slate.detachedVel)
+            slate.detachedVel = slate.detachedVel.scale(0.92)
+            finalPos = slate.detachedPos
+            if (!slate.tamperable && (finalPos.distanceTo(nominalPos) >= 4.0 || slate.slowdownTicks > 0)) {
+                unlockSlateTamperable(slate, finalPos, slate.detachedVel)
+            }
+            // 基础档：处于可篡改态且被轰向核心，碰撞核心触发反噬
+            val coreHitR = (earth.bbWidth * 0.55 + 3.2).coerceAtLeast(4.2)
+            val toCore = origin.subtract(finalPos)
+            if (slate.tamperable && !slate.rebounded && toCore.length() <= coreHitR &&
+                (slate.detachedVel.length() >= 0.20 || toCore.normalize().dot(slate.detachedVel.normalize()) > 0.15)
+            ) {
+                onSlateReboundCore(slate)
+            }
+        } else {
+            val anchor = slate.deployedPos
+            if (anchor != null) {
+                val toAnchor = anchor.subtract(currentPos)
+                val step = toAnchor.length().coerceAtMost(1.35)
+                finalPos = if (toAnchor.lengthSqr() > 0.04) currentPos.add(toAnchor.normalize().scale(step)) else anchor
+            } else {
+                finalPos = nominalPos
+            }
+        }
+
+        if (slate.tamperable && !slate.rebounded && tickCount % 3 == 0) {
+            UrCircleHexVfx.spawnConjure(
+                level(),
+                UrCircleHexVfx.SIPHON_CYAN,
+                finalPos.x + (random.nextDouble() - 0.5) * 0.8,
+                finalPos.y + (random.nextDouble() - 0.5) * 0.8,
+                finalPos.z + (random.nextDouble() - 0.5) * 0.8,
+                0.0, 0.06, 0.0,
+            )
+        }
+
+        val lookDir = if (slate.deployedPos != null || slate.detached) {
+            origin.subtract(finalPos).let { if (it.lengthSqr() > 1.0E-4) it.normalize() else nominalDir }
+        } else {
+            nominalDir
+        }
+        slate.changeState(finalPos, lookDir)
+    }
+
+    private fun unlockSlateTamperable(slate: SlatePart, pos: Vec3, vel: Vec3) {
+        if (slate.tamperable) return
+        slate.tamperable = true
+        slate.detached = true
+        slate.detachedPos = pos
+        slate.detachedVel = vel
+        hudSyncDirty = true
+        UrCircleHexVfx.playRingSound(level(), pos, 32.0, HexSounds.ADD_TO_PATTERN, 1.8F, 1.45F)
+        UrCircleHexVfx.spawnRingArc(level(), beamOrigin(), pos, UrCircleHexVfx.SIPHON_CYAN, steps = 10)
+    }
+
+    /** 基础档：将可篡改石板轰回核心，伤害本体并大幅削减稳态。 */
+    fun onSlateReboundCore(slate: SlatePart) {
+        if (level().isClientSide || slate.rebounded || circleState == CircleState.DYING) return
+        slate.rebounded = true
+        slate.tamperable = false
+        slate.detachedVel = Vec3.ZERO
+        hudSyncDirty = true
+
+        val origin = beamOrigin()
+        val backlashDmg = when (slate.symbolType) {
+            SlateSymbolType.TRIGGER -> 32.0F
+            SlateSymbolType.AIM -> 22.0F
+            else -> 16.0F
+        }
+        val stabilityCost = when (slate.symbolType) {
+            SlateSymbolType.TRIGGER -> 75
+            SlateSymbolType.AIM -> 55
+            else -> 45
+        }
+
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), SoundEvents.GLASS_BREAK, 2.6F, 1.1F)
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.CAST_THOTH, 2.4F, 1.3F)
+        for (k in 0 until 24) {
+            UrCircleHexVfx.spawnConjure(
+                level(),
+                UrCircleHexVfx.SIPHON_CYAN,
+                origin.x, origin.y, origin.z,
+                (random.nextDouble() - 0.5) * 0.65,
+                (random.nextDouble() - 0.5) * 0.65,
+                (random.nextDouble() - 0.5) * 0.65,
+            )
+        }
+
+        internalHealthWrite = true
+        try {
+            setHealth(health - backlashDmg)
+        } finally {
+            internalHealthWrite = false
+        }
+        if (health <= 0.0F) {
+            die(level().damageSources().magic())
+            return
+        }
+        checkPhaseThresholds()
+        reduceStability(stabilityCost, triggerInstantly = true)
+    }
+
+    private fun syncClientSlateFromHud(slate: SlatePart, nominalPos: Vec3, nominalDir: Vec3, origin: Vec3) {
+        val entry = UrCircleHudTracker.getSlateEntry(id, slate.globalIndex)
+        if (entry != null) {
+            slate.symbolType = SlateSymbolType.byId(entry.symbolType)
+            slate.tamperable = entry.tamperable
+            slate.rebounded = entry.rebounded
+            slate.applyScale(partVisualScale(slate))
+            if (entry.hasCustomPos) {
+                val targetPos = Vec3(entry.posX, entry.posY, entry.posZ)
+                val nextPos = if (slate.posNow != Vec3.ZERO && slate.posNow.distanceToSqr(targetPos) < 16.0 * 16.0) {
+                    slate.posNow.lerp(targetPos, 0.45)
+                } else {
+                    targetPos
+                }
+                val lookDir = origin.subtract(nextPos).let {
+                    if (it.lengthSqr() > 1.0E-4) it.normalize() else nominalDir
+                }
+                slate.changeState(nextPos, lookDir)
+            } else {
+                slate.changeState(nominalPos, nominalDir)
+            }
+        } else {
+            if (slate.symbolType != SlateSymbolType.NONE) {
+                slate.clearSymbol()
+                slate.applyScale(partVisualScale(slate))
+            }
+            slate.changeState(nominalPos, nominalDir)
+        }
+    }
+
+    /** 进阶档：玩家使用 OpTheCoolerWrite 覆写可篡改石板图案，瞬间诱发大环 Mishap 并虹吸媒质。 */
+    fun onSlateHexOverwrite(slate: SlatePart, _writtenIota: Iota) {
+        if (level().isClientSide || slate.rebounded || circleState == CircleState.DYING) return
+        slate.rebounded = true
+        slate.tamperable = false
+        hudSyncDirty = true
+
+        val origin = beamOrigin()
+        UrCircleHexVfx.spawnRingArc(level(), slate.posNow, origin, UrCircleHexVfx.SIPHON_CYAN, steps = 16)
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.SPELL_CIRCLE_FAIL, 2.8F, 1.35F)
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.CAST_HERMES, 2.4F, 1.25F)
+
+        // 为周围玩家携带的媒质容器补充媒质作为“虹吸 UrCircleMediaWave 媒质波”收益
+        val serverLevel = level() as? ServerLevel
+        if (serverLevel != null) {
+            val box = AABB(origin, origin).inflate(48.0)
+            for (player in serverLevel.getEntitiesOfClass(ServerPlayer::class.java, box)) {
+                var remaining = MediaConstants.CRYSTAL_UNIT * 5L
+                for (stack in listOf(player.mainHandItem, player.offhandItem)) {
+                    if (stack.isEmpty || remaining <= 0L) continue
+                    val holder = IXplatAbstractions.INSTANCE.findMediaHolder(stack) ?: continue
+                    if (holder.canRecharge()) {
+                        val accepted = holder.insertMedia(remaining, false)
+                        remaining -= accepted
+                    }
+                }
+                UrCircleHexVfx.spawnRingArc(serverLevel, origin, player.eyePosition, UrCircleHexVfx.SIPHON_CYAN, steps = 12)
+            }
+        }
+
+        internalHealthWrite = true
+        try {
+            setHealth(health - HEX_OVERWRITE_DAMAGE)
+        } finally {
+            internalHealthWrite = false
+        }
+        if (health <= 0.0F) {
+            die(level().damageSources().magic())
+            return
+        }
+        stability = 0
+        triggerShortCircuit()
+    }
+
+    fun onProtectedSlateWriteAttempt(slate: SlatePart) {
+        if (level().isClientSide) return
+        val p = if (slate.posNow != Vec3.ZERO) slate.posNow else beamOrigin()
+        UrCircleHexVfx.playRingSound(level(), p, 24.0, HexSounds.CAST_FAILURE, 1.6F, 1.3F)
+        for (k in 0 until 8) {
+            UrCircleHexVfx.spawnConjure(
+                level(),
+                UrCircleHexVfx.SHORT_CIRCUIT_RED,
+                p.x, p.y, p.z,
+                (random.nextDouble() - 0.5) * 0.25,
+                (random.nextDouble() - 0.5) * 0.25,
+                (random.nextDouble() - 0.5) * 0.25,
+            )
         }
     }
 
@@ -1124,7 +1601,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
         // 1. 失控暴走期与逐环崩碎波次
         for (ring in rings) {
-            if (!ring.isVisible(phase, phase2Reveal)) continue
+            if (!ring.isVisible(phase, phase2Reveal, phase3Reveal)) continue
             for (part in ring.parts) {
                 if (part.active && t == deathVanishTick(part)) {
                     spawnPartBreak(part, isSlate = part is SlatePart)
@@ -1258,6 +1735,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         super.addAdditionalSaveData(nbt)
         nbt.putBoolean("hexmob:Dormant", dormant)
         nbt.putInt("hexmob:Phase", phase)
+        nbt.putInt("hexmob:Stability", stability)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -1268,27 +1746,51 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         super.readAdditionalSaveData(compound)
         internalHealthWrite = false
         val savedPhase = if (compound.contains("hexmob:Phase")) {
-            compound.getInt("hexmob:Phase").coerceIn(1, 2)
-        } else if (health <= maxHealth * 0.5F) {
+            compound.getInt("hexmob:Phase").coerceIn(1, 3)
+        } else if (health <= maxHealth * PHASE3_HP_RATIO) {
+            3
+        } else if (health <= maxHealth * PHASE2_HP_RATIO) {
             2
         } else {
             1
         }
         phase = savedPhase
         phase2Reveal = if (savedPhase >= 2) 1.0F else 0.0F
+        phase3Reveal = if (savedPhase >= 3) 1.0F else 0.0F
+        stability = if (compound.contains("hexmob:Stability")) {
+            compound.getInt("hexmob:Stability").coerceIn(0, MAX_STABILITY)
+        } else {
+            MAX_STABILITY
+        }
     }
 
     override fun getAllParts(): List<UrCirclePart> = cachedAllParts
     override fun getPartsBoundingBox(): AABB {
-        val r = if (phase >= 2) maxOf(ringOuterRadius() * 1.7, 210.0) else maxOf(ringOuterRadius() + 24.0, 96.0)
-        val yUp = if (phase >= 2) maxOf(r * 0.9, 170.0) else r
-        val yDown = if (phase >= 2) maxOf(r * 0.7, 150.0) else r * 0.85
+        val r = when {
+            phase >= 3 -> maxOf(ringOuterRadius() * 2.8, 440.0)
+            phase >= 2 -> maxOf(ringOuterRadius() * 1.8, 240.0)
+            else -> maxOf(ringOuterRadius() + 24.0, 96.0)
+        }
+        val yUp = when {
+            phase >= 3 -> 400.0
+            phase >= 2 -> 190.0
+            else -> r
+        }
+        val yDown = when {
+            phase >= 3 -> 240.0
+            phase >= 2 -> 160.0
+            else -> r * 0.85
+        }
         val c = position().add(0.0, bbHeight * 0.5, 0.0)
         return AABB(c.x - r, c.y - yDown, c.z - r, c.x + r, c.y + yUp, c.z + r)
     }
     override fun getBoundingBoxForCulling(): AABB = getPartsBoundingBox()
     override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
-        val maxDist = if (phase >= 2) 420.0 else 280.0
+        val maxDist = when {
+            phase >= 3 -> 680.0
+            phase >= 2 -> 480.0
+            else -> 300.0
+        }
         return distance <= maxDist * maxDist
     }
     override fun shouldRecord(): Boolean = isAlive
@@ -1321,6 +1823,25 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 shatterSiphon()
             }
 
+            if (part is SlatePart && part.symbolType != SlateSymbolType.NONE && amount > 0.0F) {
+                if (source.`is`(DamageTypes.FREEZE)) {
+                    part.slowdownTicks = 80
+                    if (!part.tamperable) {
+                        unlockSlateTamperable(part, part.posNow, Vec3.ZERO)
+                    }
+                }
+                val fromPos = source.sourcePosition ?: source.directEntity?.position() ?: source.entity?.position()
+                val pushDir = if (fromPos != null) {
+                    part.posNow.subtract(fromPos).let { if (it.lengthSqr() > 1.0E-4) it.normalize() else source.entity?.lookAngle ?: Vec3.ZERO }
+                } else {
+                    source.entity?.lookAngle ?: Vec3.ZERO
+                }
+                if (pushDir.lengthSqr() > 1.0E-4) {
+                    val pushStrength = if (part.tamperable) 1.05 + (amount / 14.0).coerceAtMost(0.85) else 0.45 + (amount / 18.0).coerceAtMost(0.45)
+                    part.setDeltaMovement(part.deltaMovement.add(pushDir.scale(pushStrength)))
+                }
+            }
+
             if (circleState == CircleState.CHANNELING) {
                 val active = currentSkill
                 if (active != null && active.usesMediaWave && mediaWave.onPartHurt(this, active, part, amount)) {
@@ -1334,7 +1855,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 }
             }
         }
-        return hurt(source, amount)
+        val partScaled = if (part is SlatePart && part.symbolType != SlateSymbolType.NONE && !part.tamperable) {
+            amount * 0.35F
+        } else {
+            amount
+        }
+        return hurt(source, partScaled)
     }
 
     private fun shatterSiphon() {
@@ -1369,9 +1895,10 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         }
         var dmg = if (isFireDamage(source)) amount * FIRE_DAMAGE_MULTIPLIER else amount
         if (circleState == CircleState.SHORT_CIRCUIT) {
-            dmg *= 1.25F
+            dmg *= 1.45F
         } else if (!level().isClientSide) {
-            dmg *= servantDamageMultiplier()
+            val shieldMul = 1.0F - coreShieldPct() / 100.0F
+            dmg *= servantDamageMultiplier() * shieldMul
         }
         if (dmg > SOFT_HIT_CAP) {
             dmg = SOFT_HIT_CAP + (dmg - SOFT_HIT_CAP) * DAMAGE_OVERFLOW_MULTIPLIER
@@ -1401,9 +1928,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 super.hurt(source, dmg)
             }
             if (result && !level().isClientSide && dmg > 0.0F) {
-                if (phase == 1 && isAlive && health > 0.0F && health <= maxHealth * 0.5F && circleState != CircleState.DYING) {
-                    beginPhase2Transition()
-                }
+                checkPhaseThresholds()
             }
             result
         } finally {
@@ -1453,6 +1978,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             }
             else -> return
         }
+        clearAllSymbolicSlates()
         discardCircleBeam()
         discardAnchors()
         setPlaneSlicing(false, 0.0F)
@@ -1715,8 +2241,9 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     // ---- 调试命令入口 ----
 
     fun forceSetPhase(targetPhase: Int) {
-        val p = targetPhase.coerceIn(1, 2)
+        val p = targetPhase.coerceIn(1, 3)
         interruptChannel()
+        clearAllSymbolicSlates()
         dormant = false
         wokenOnce = true
         entityData.set(DORMANT, false)
@@ -1725,6 +2252,9 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         foldProgress = 0.0F
         phase = p
         phase2Reveal = if (p >= 2) 1.0F else 0.0F
+        phase3Reveal = if (p >= 3) 1.0F else 0.0F
+        stability = MAX_STABILITY
+        hudSyncDirty = true
         circleState = CircleState.CRUISE
         stateTicks = 0
     }
@@ -1779,9 +2309,17 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         wokenOnce = true
         entityData.set(DORMANT, false)
         dormantFold = 0.0F
-        phase = 1
-        phase2Reveal = 0.0F
-        beginPhase2Transition()
+        if (phase >= 2) {
+            phase = 2
+            phase2Reveal = 1.0F
+            phase3Reveal = 0.0F
+            beginPhase3Transition()
+        } else {
+            phase = 1
+            phase2Reveal = 0.0F
+            phase3Reveal = 0.0F
+            beginPhase2Transition()
+        }
     }
 
     fun forceTriggerDeath() {
@@ -1793,7 +2331,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     fun debugSummary(): String =
         "phase=$phase state=$circleState($stateTicks) hp=${"%.1f".format(health)}/${"%.0f".format(maxHealth)} " +
-            "reveal=${"%.2f".format(phase2Reveal)} fold=${"%.2f".format(foldProgress)} dormant=$dormant " +
+            "stab=$stability shield=${coreShieldPct()}% slates=${activeSymbolicSlates.size} " +
+            "reveal=${"%.2f".format(phase2Reveal)}/${"%.2f".format(phase3Reveal)} fold=${"%.2f".format(foldProgress)} dormant=$dormant " +
             "outerR=${"%.1f".format(ringOuterRadius())} rings=${rings.size} parts=${cachedAllParts.size} " +
             "servants=${livingServants()}(dmg*${"%.2f".format(servantDamageMultiplier())}) anchors=${activeAnchors.size}"
 
@@ -1820,6 +2359,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val DORMANT: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.BOOLEAN)
         val DORMANT_FOLD: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
         val PHASE2_REVEAL: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val PHASE3_REVEAL: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val STABILITY: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
         val FOLD_PROGRESS: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
         val ACTIVE_NODE_A: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
         val ACTIVE_NODE_B: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
@@ -1841,7 +2382,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val CHARGE_COOLDOWN = 100
         const val GROUND_CRATER_COOLDOWN = 40
         const val AMBIENT_SOUND_INTERVAL = 100
-        const val BOSS_BAR_RANGE = 300.0
+        const val BOSS_BAR_RANGE = 420.0
         const val WAKE_RANGE = 42.0
         const val ARENA_CHECK_MAX_TICKS = 60
         const val SKILL_COOLDOWN = 90
@@ -1860,6 +2401,10 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val PHASE_TRANSITION_TICKS = 80
         const val SHORT_CIRCUIT_TICKS = 100
         const val SHORT_CIRCUIT_DAMAGE = 25.0F
+        const val HEX_OVERWRITE_DAMAGE = 22.0F
+        const val MAX_STABILITY = 100
+        const val PHASE2_HP_RATIO = 0.65F
+        const val PHASE3_HP_RATIO = 0.30F
 
         const val HATE_RANGE = 300.0
         const val SERVANT_DEATH_DAMAGE = 5.0F

@@ -68,7 +68,7 @@ class UrCircleMediaWave {
                 }
                 // 二阶段时，在主波节点与最近促动石间拉一道媒质弧线
                 if (curPartA.posNow != Vec3.ZERO) {
-                    val polarOrInner = circle.rings.getOrNull(3)?.takeIf { it.isVisible(circle.phase, circle.phase2Reveal) }
+                    val polarOrInner = circle.rings.getOrNull(3)?.takeIf { it.isVisible(circle.phase, circle.phase2Reveal, circle.phase3Reveal) }
                         ?: circle.rings.getOrNull(0)
                     val impetus = polarOrInner?.parts
                         ?.filter { it.active && it.posNow != Vec3.ZERO }

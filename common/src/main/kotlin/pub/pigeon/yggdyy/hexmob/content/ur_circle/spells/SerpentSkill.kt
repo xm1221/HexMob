@@ -8,6 +8,7 @@ import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.serpent.UrCircleSerpent
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 import kotlin.math.cos
 import kotlin.math.sin
@@ -19,12 +20,23 @@ class SerpentSkill : UrCircleSkill("serpent", 80) {
 
     override fun canUse(circle: UrCircleEntity): Boolean {
         val t = circle.target
-        return t != null && t.isAlive && circle.health / circle.maxHealth > 0.5
+        return t != null && t.isAlive
     }
 
     override fun channelParticleType(circle: UrCircleEntity) =
         BlockParticleOption(ParticleTypes.BLOCK, HexBlocks.SLATE.defaultBlockState())
     override fun channelParticlesPerPulse(circle: UrCircleEntity): Int = 16
+
+    override fun onChannelTick(circle: UrCircleEntity) {
+        val t = circle.target ?: return
+        val ang = circle.tickCount * 0.14
+        val anchor = Vec3(t.x + cos(ang) * 4.8, t.y + 2.4, t.z + sin(ang) * 4.8)
+        val lock = circle.findSymbolicSlate(SlateSymbolType.LOCK)
+            ?: circle.deploySymbolicSlate(SlateSymbolType.LOCK, anchor)
+        if (lock != null && !lock.detached && !lock.rebounded) {
+            lock.deployedPos = anchor
+        }
+    }
 
     override fun onChannelHurt(circle: UrCircleEntity, source: DamageSource, amount: Float): Boolean {
         if (amount > 0.0F) {
@@ -38,11 +50,13 @@ class SerpentSkill : UrCircleSkill("serpent", 80) {
         if (level.isClientSide) return
         val origin = circle.beamOrigin()
         val t = circle.target
-        val base = if (t != null && t.isAlive) {
-            t.position().add(0.0, t.bbHeight / 2.0, 0.0).subtract(origin).normalize()
-        } else {
-            Vec3(0.0, 0.0, 1.0)
+        val lock = circle.findSymbolicSlate(SlateSymbolType.LOCK)
+        val focusPoint = when {
+            lock != null && (lock.detached || lock.rebounded) && lock.posNow != Vec3.ZERO -> lock.posNow
+            t != null && t.isAlive -> t.position().add(0.0, t.bbHeight / 2.0, 0.0)
+            else -> origin.add(0.0, 0.0, 8.0)
         }
+        val base = focusPoint.subtract(origin).let { if (it.lengthSqr() > 1.0E-4) it.normalize() else Vec3(0.0, 0.0, 1.0) }
         val serpentScale = if (circle.phase >= 2) 1.5F else 1.0F
         for (i in 0 until SERPENT_COUNT) {
             val serpent = UrCircleSerpent(HexMobEntities.UR_CIRCLE_SERPENT.get(), level)
@@ -70,9 +84,7 @@ class SerpentSkill : UrCircleSkill("serpent", 80) {
     }
 
     companion object {
-        /** 一次放出几条。 */
         const val SERPENT_COUNT = 3
-        /** 扇形间隔（弧度）。 */
         const val FAN_ANGLE = 0.18
     }
 }
