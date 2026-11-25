@@ -77,16 +77,16 @@ class UrCircleCruiseGoal(private val circle: UrCircleEntity) : Goal() {
     }
 
     companion object {
-        const val PREFERRED_RANGE_PHASE1 = 14.0
-        const val APPROACH_RANGE_PHASE1 = 18.0
-        const val BACK_OFF_RANGE_PHASE1 = 7.0
-        const val HOVER_HEIGHT_PHASE1 = 10.0
-        const val FLY_CEILING_PHASE1 = 24.0
+        const val PREFERRED_RANGE_PHASE1 = 26.0
+        const val APPROACH_RANGE_PHASE1 = 36.0
+        const val BACK_OFF_RANGE_PHASE1 = 14.0
+        const val HOVER_HEIGHT_PHASE1 = 24.0
+        const val FLY_CEILING_PHASE1 = 50.0
 
-        const val PREFERRED_RANGE_PHASE2 = 22.0
-        const val APPROACH_RANGE_PHASE2 = 28.0
-        const val BACK_OFF_RANGE_PHASE2 = 12.0
-        const val HOVER_HEIGHT_PHASE2 = 22.0
-        const val FLY_CEILING_PHASE2 = 42.0
+        const val PREFERRED_RANGE_PHASE2 = 34.0
+        const val APPROACH_RANGE_PHASE2 = 48.0
+        const val BACK_OFF_RANGE_PHASE2 = 18.0
+        const val HOVER_HEIGHT_PHASE2 = 66.0
+        const val FLY_CEILING_PHASE2 = 120.0
     }
 }

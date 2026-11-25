@@ -8,12 +8,24 @@ import dev.architectury.event.events.common.CommandRegistrationEvent
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import pub.pigeon.yggdyy.hexmob.config.HexMobServerConfig
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 
 /** 服务端调试/管理命令。 */
 object HexMobCommands {
+    private val SKILL_NAMES = listOf(
+        "core_beam",
+        "orbital_barrage",
+        "serpent",
+        "erupt_serpent",
+        "dive_grind",
+        "plane_slice",
+        "summon_servants",
+    )
+
     fun init() {
         CommandRegistrationEvent.EVENT.register { dispatcher, _, _ ->
             dispatcher.register(
@@ -50,6 +62,25 @@ object HexMobCommands {
                     .then(
                         Commands.literal("urcircle")
                             .then(
+                                Commands.literal("spawn")
+                                    .executes { ctx -> spawnDebugCircle(ctx.source, phase = 1) }
+                                    .then(
+                                        Commands.argument("phase", IntegerArgumentType.integer(1, 2))
+                                            .executes { ctx ->
+                                                val p = IntegerArgumentType.getInteger(ctx, "phase")
+                                                spawnDebugCircle(ctx.source, p)
+                                            },
+                                    ),
+                            )
+                            .then(
+                                Commands.literal("info")
+                                    .executes { ctx ->
+                                        val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                        ctx.source.sendSuccess({ Component.literal("[大环状态] ${circle.debugSummary()}") }, false)
+                                        1
+                                    },
+                            )
+                            .then(
                                 Commands.literal("phase")
                                     .then(
                                         Commands.argument("value", IntegerArgumentType.integer(1, 2))
@@ -61,6 +92,15 @@ object HexMobCommands {
                                                 1
                                             },
                                     ),
+                            )
+                            .then(
+                                Commands.literal("transition")
+                                    .executes { ctx ->
+                                        val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                        circle.forceTriggerTransition()
+                                        ctx.source.sendSuccess({ Component.literal("已触发大环二阶段坍缩爆裂转场动画") }, true)
+                                        1
+                                    },
                             )
                             .then(
                                 Commands.literal("wake")
@@ -106,6 +146,10 @@ object HexMobCommands {
                                 Commands.literal("skill")
                                     .then(
                                         Commands.argument("name", StringArgumentType.word())
+                                            .suggests { _, builder ->
+                                                for (s in SKILL_NAMES) builder.suggest(s)
+                                                builder.buildFuture()
+                                            }
                                             .executes { ctx ->
                                                 val circle = requireNearestCircle(ctx.source) ?: return@executes 0
                                                 val name = StringArgumentType.getString(ctx, "name")
@@ -118,20 +162,90 @@ object HexMobCommands {
                                                 1
                                             },
                                     ),
+                            )
+                            .then(
+                                Commands.literal("cooldown")
+                                    .then(
+                                        Commands.argument("ticks", IntegerArgumentType.integer(0, 600))
+                                            .executes { ctx ->
+                                                val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                                val ticks = IntegerArgumentType.getInteger(ctx, "ticks")
+                                                circle.forceResetCooldown(ticks)
+                                                ctx.source.sendSuccess({ Component.literal("大环技能冷却已设为 $ticks ticks") }, true)
+                                                1
+                                            },
+                                    )
+                                    .executes { ctx ->
+                                        val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                        circle.forceResetCooldown(0)
+                                        ctx.source.sendSuccess({ Component.literal("大环技能冷却已清零") }, true)
+                                        1
+                                    },
+                            )
+                            .then(
+                                Commands.literal("hp")
+                                    .then(
+                                        Commands.argument("value", FloatArgumentType.floatArg(1.0F, 10000.0F))
+                                            .executes { ctx ->
+                                                val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                                val hp = FloatArgumentType.getFloat(ctx, "value")
+                                                circle.forceSetHealth(hp)
+                                                ctx.source.sendSuccess({ Component.literal("大环当前生命值已设为 ${circle.health}") }, true)
+                                                1
+                                            },
+                                    ),
+                            )
+                            .then(
+                                Commands.literal("heal")
+                                    .executes { ctx ->
+                                        val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                        circle.forceSetHealth(circle.maxHealth)
+                                        ctx.source.sendSuccess({ Component.literal("大环已回满生命（${circle.maxHealth}）") }, true)
+                                        1
+                                    },
+                            )
+                            .then(
+                                Commands.literal("die")
+                                    .executes { ctx ->
+                                        val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                        circle.forceTriggerDeath()
+                                        ctx.source.sendSuccess({ Component.literal("已触发大环完整死亡终幕演出") }, true)
+                                        1
+                                    },
+                            )
+                            .then(
+                                Commands.literal("kill")
+                                    .executes { ctx ->
+                                        val circle = requireNearestCircle(ctx.source) ?: return@executes 0
+                                        circle.remove(Entity.RemovalReason.DISCARDED)
+                                        ctx.source.sendSuccess({ Component.literal("已清除最近的大环实体") }, true)
+                                        1
+                                    },
                             ),
                     ),
             )
         }
     }
 
+    private fun spawnDebugCircle(src: CommandSourceStack, phase: Int): Int {
+        val level = src.level
+        val pos = src.position.add(0.0, if (phase >= 2) 56.0 else 22.0, 0.0)
+        val circle = UrCircleEntity(HexMobEntities.UR_CIRCLE.get(), level)
+        circle.setPos(pos.x, pos.y, pos.z)
+        circle.forceSetPhase(phase)
+        level.addFreshEntity(circle)
+        src.sendSuccess({ Component.literal("已在上方生成 ${phase} 阶段大环（半径=${"%.1f".format(circle.ringOuterRadius())}）") }, true)
+        return 1
+    }
+
     private fun requireNearestCircle(src: CommandSourceStack): UrCircleEntity? {
         val pos = src.position
         val circle = src.level.getEntitiesOfClass(
             UrCircleEntity::class.java,
-            AABB(pos, pos).inflate(128.0),
+            AABB(pos, pos).inflate(256.0),
         ) { it.isAlive }.minByOrNull { it.distanceToSqr(pos) }
         if (circle == null) {
-            src.sendFailure(Component.literal("128 格内未找到存活的大环实体"))
+            src.sendFailure(Component.literal("256 格内未找到存活的大环实体"))
         }
         return circle
     }

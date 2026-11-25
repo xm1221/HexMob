@@ -49,7 +49,7 @@ object HexMobEntities {
         EntityType.Builder.of(
             {type, level -> UrCircleEntity(type, level)},
             MobCategory.MISC
-        ).sized(10F, 6F).clientTrackingRange(16).build("ur_circle")
+        ).sized(10F, 6F).clientTrackingRange(24).build("ur_circle")
     }
     val IOTA_SHEEP: DeferredSupplier<EntityType<IotaSheepEntity>> = ENTITIES.register("iota_sheep") {
         EntityType.Builder.of(
@@ -81,7 +81,7 @@ object HexMobEntities {
         EntityType.Builder.of(
             { type, level -> UrCoreBeamEntity(type, level) },
             MobCategory.MISC
-        ).sized(2F, 2F).clientTrackingRange(16).build("ur_core_beam")
+        ).sized(2F, 2F).clientTrackingRange(24).build("ur_core_beam")
     }
     val UR_CIRCLE_ANCHOR: DeferredSupplier<EntityType<UrCircleAnchorEntity>> = ENTITIES.register("ur_circle_anchor") {
         EntityType.Builder.of(

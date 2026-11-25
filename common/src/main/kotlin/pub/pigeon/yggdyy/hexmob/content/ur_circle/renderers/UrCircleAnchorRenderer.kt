@@ -141,10 +141,48 @@ class UrCircleAnchorRenderer(context: EntityRendererProvider.Context) : EntityRe
         val m4: Matrix4f = pose.pose()
         val m3: Matrix3f = pose.normal()
 
-        drawBeamTube(buffer.getBuffer(RenderType.beaconBeam(BEACON_TEX, false)), m4, m3, 0.16F, length, -(t * 0.12F), length * 0.3F - t * 0.12F, 255, 240, 255, 255)
-        drawBeamTube(buffer.getBuffer(RenderType.beaconBeam(BEACON_TEX, true)), m4, m3, 0.42F, length, t * 0.06F, length * 0.2F + t * 0.06F, cr, cg, cb, 145)
+        drawBeamTube(buffer.getBuffer(RenderType.beaconBeam(BEACON_TEX, false)), m4, m3, 0.12F, length, -(t * 0.12F), length * 0.3F - t * 0.12F, 210, 145, 255, 225)
+        drawBeamTube(buffer.getBuffer(RenderType.beaconBeam(BEACON_TEX, true)), m4, m3, 0.34F, length, t * 0.06F, length * 0.2F + t * 0.06F, cr, cg, cb, 125)
+
+        // 上行脉冲能量段：沿导管从地面晶锚一路“泵入”高空大环，直观表明供能方向
+        val lineBuf = buffer.getBuffer(RenderType.lightning())
+        val packetCount = 4
+        for (p in 0 until packetCount) {
+            val phase = ((t * 0.032F + p.toFloat() / packetCount) % 1.0F)
+            val zStart = phase * length
+            val zEnd = (zStart + 2.4F).coerceAtMost(length)
+            if (zEnd > zStart) {
+                drawBeamSegmentTube(lineBuf, m4, 0.56F, zStart, zEnd, 255, 232, 145, 225)
+            }
+        }
 
         poseStack.popPose()
+    }
+
+    private fun drawBeamSegmentTube(
+        consumer: VertexConsumer,
+        m4: Matrix4f,
+        r: Float,
+        zStart: Float,
+        zEnd: Float,
+        red: Int,
+        green: Int,
+        blue: Int,
+        alpha: Int,
+    ) {
+        var prevX = 0.0F
+        var prevY = r
+        for (i in 1..6) {
+            val rad = i * 6.2831855F / 6.0F
+            val nx = Mth.sin(rad) * r
+            val ny = Mth.cos(rad) * r
+            consumer.vertex(m4, prevX, prevY, zStart).color(red, green, blue, alpha).endVertex()
+            consumer.vertex(m4, prevX, prevY, zEnd).color(red, green, blue, alpha).endVertex()
+            consumer.vertex(m4, nx, ny, zEnd).color(red, green, blue, alpha).endVertex()
+            consumer.vertex(m4, nx, ny, zStart).color(red, green, blue, alpha).endVertex()
+            prevX = nx
+            prevY = ny
+        }
     }
 
     private fun drawBeamTube(

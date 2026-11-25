@@ -35,7 +35,7 @@ abstract class UrCirclePart(
     }
 
     fun applyScale(scale: Float) {
-        val s = scale.coerceIn(0.25F, 12.0F)
+        val s = scale.coerceIn(0.25F, 24.0F)
         if (abs(s - appliedScale) >= 0.02F) {
             appliedScale = s
             size = EntityDimensions.scalable(baseWidth * s, baseHeight * s)

@@ -4,6 +4,7 @@ import dev.architectury.event.events.client.ClientTickEvent
 import me.shedaniel.autoconfig.AutoConfig
 import net.minecraft.client.gui.screens.Screen
 import pub.pigeon.yggdyy.hexmob.client.HexMobGaslightingTracker
+import pub.pigeon.yggdyy.hexmob.client.UrCircleSkyTracker
 import pub.pigeon.yggdyy.hexmob.config.HexMobClientConfig
 import pub.pigeon.yggdyy.hexmob.registry.HexMobBlockEntityRenderers
 import pub.pigeon.yggdyy.hexmob.registry.HexMobItemProperties
@@ -15,6 +16,7 @@ object HexMobClient {
         HexMobItemProperties.init()
         HexMobBlockEntityRenderers.init()
         ClientTickEvent.CLIENT_POST.register { client ->
+            UrCircleSkyTracker.tick(client)
             if (!client.isPaused) {
                 HexMobGaslightingTracker.postFrameCheckRendered()
             }

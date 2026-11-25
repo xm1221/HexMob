@@ -9,7 +9,6 @@ import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.CompoundTag
-import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
@@ -105,6 +104,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     var polarRotation: Float
         get() = entityData.get(ROT_POLAR)
         set(value) = entityData.set(ROT_POLAR, value)
+    var zenithRotation: Float
+        get() = entityData.get(ROT_ZENITH)
+        set(value) = entityData.set(ROT_ZENITH, value)
+    var apexRotation: Float
+        get() = entityData.get(ROT_APEX)
+        set(value) = entityData.set(ROT_APEX, value)
 
     var circleState: CircleState
         get() = CircleState.byId(entityData.get(STATE))
@@ -199,6 +204,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         entityData.define(ECLIPTIC_ROTATION, 0F)
         entityData.define(ROT_OUTER, 0F)
         entityData.define(ROT_POLAR, 0F)
+        entityData.define(ROT_ZENITH, 0F)
+        entityData.define(ROT_APEX, 0F)
         entityData.define(STATE, CircleState.CRUISE.ordinal)
         entityData.define(STATE_TICKS, 0)
         entityData.define(TUMBLING, false)
@@ -241,6 +248,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             combatBrain()
             if (circleState != CircleState.DYING && circleState != CircleState.PHASE_TRANSITION) {
                 tickSiphonState()
+                tickTitanUpdraftParticles()
                 idleBehavior()
                 hurtContacts()
                 tryFireSlate()
@@ -343,12 +351,14 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             1 -> eclipticRotation
             2 -> outerRotation
             3 -> polarRotation
+            4 -> zenithRotation
+            5 -> apexRotation
             else -> 0.0F
         }
 
     fun partVisualScale(part: UrCirclePart): Float {
         if (part === earth) {
-            return totalScale() * (if (phase >= 2) 1.08F else 1.0F)
+            return totalScale() * (if (phase >= 2) 2.4F else 1.5F)
         }
         val track = rings.getOrNull(part.ringIndex)
         val mul = track?.partScale ?: 1.0F
@@ -368,7 +378,11 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     fun updateShape() {
         if (!level().isClientSide) {
             if (dormant) return
-            phase2Reveal = if (phase >= 2) stepToward(phase2Reveal, 1.0F, 0.025F) else 0.0F
+            phase2Reveal = when {
+                phase < 2 -> 0.0F
+                circleState == CircleState.PHASE_TRANSITION && stateTicks < PHASE_BURST_TICK -> 0.0F
+                else -> stepToward(phase2Reveal, 1.0F, 0.032F)
+            }
             foldProgress = stepToward(foldProgress, targetFoldProgress, 0.04F)
 
             val base = rotationSpeedFactor()
@@ -391,6 +405,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             eclipticRotation += rings[1].spinDir * rot * rings[1].spinSpeedMul
             if (rings.size > 2) outerRotation += rings[2].spinDir * rot * rings[2].spinSpeedMul
             if (rings.size > 3) polarRotation += rings[3].spinDir * rot * rings[3].spinSpeedMul
+            if (rings.size > 4) zenithRotation += rings[4].spinDir * rot * rings[4].spinSpeedMul
+            if (rings.size > 5) apexRotation += rings[5].spinDir * rot * rings[5].spinSpeedMul
 
             val tumbling = (circleState == CircleState.CHANNELING && currentSkill?.channelInterruptible == true &&
                 currentSkill !is DiveGrindSkill) || circleState == CircleState.DYING
@@ -638,10 +654,48 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         }
         hatedTargets.clear()
         target = null
+
+        val origin = beamOrigin()
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.SPELL_CIRCLE_FAIL, 3.2F, 0.75F)
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), SoundEvents.BEACON_DEACTIVATE, 2.8F, 0.7F)
     }
 
     override fun tickDeath() {
         // 移除由 DYING 序列结束时的 finishDeath() 统一执行
+    }
+
+    private fun tickTitanUpdraftParticles() {
+        if (phase < 2 && circleState != CircleState.CHANNELING) return
+        val interval = if (phase >= 2) 3 else 6
+        if (tickCount % interval != 0) return
+
+        val origin = beamOrigin()
+        val spreadR = if (phase >= 2) 48.0 else 22.0
+        val count = if (phase >= 2) 5 else 2
+        val lvl = level()
+        for (i in 0 until count) {
+            val ang = random.nextDouble() * Math.PI * 2.0
+            val dist = 8.0 + random.nextDouble() * spreadR
+            val sx = origin.x + cos(ang) * dist
+            val sz = origin.z + sin(ang) * dist
+            val groundY = lvl.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, net.minecraft.util.Mth.floor(sx), net.minecraft.util.Mth.floor(sz))
+            val sy = if (groundY > lvl.minBuildHeight) {
+                groundY + 0.3 + random.nextDouble() * 5.0
+            } else {
+                origin.y - (if (phase >= 2) 34.0 else 16.0) + random.nextDouble() * 14.0
+            }
+            val vx = (origin.x - sx) * 0.014
+            val vy = 0.28 + random.nextDouble() * 0.22
+            val vz = (origin.z - sz) * 0.014
+            val particle = when {
+                i == 0 -> AMETHYST_BREAK
+                i == 1 && phase >= 2 -> SLATE_BREAK
+                else -> UrCircleHexVfx.conjure(
+                    if (i % 2 == 0) UrCircleHexVfx.MEDIA_PURPLE else UrCircleHexVfx.WAVE_GOLD
+                )
+            }
+            spawnParticle(lvl, particle, sx, sy, sz, vx, vy, vz, UrCircleHexVfx.DEFAULT_RANGE)
+        }
     }
 
     private fun tickSiphonState() {
@@ -659,7 +713,6 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 setSiphoning(true)
                 siphonTimer = 0
                 UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), HexSounds.ABACUS_SHAKE, 1.8F, 0.85F)
-                notifyNearbyPlayers(Component.translatable("message.hexmob.ur_circle.siphon_start"))
             }
         } else {
             if (tickCount % 3 == 0) {
@@ -868,17 +921,63 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     }
 
     private fun runPhaseTransition() {
-        targetFoldProgress = 0.0F
-        if (stateTicks < 40) {
-            setDeltaMovement(0.0, 0.22, 0.0)
+        val origin = beamOrigin()
+        if (stateTicks < PHASE_BURST_TICK) {
+            targetFoldProgress = 1.0F
+            setDeltaMovement(0.0, 0.14, 0.0)
+            if (stateTicks % 2 == 0) {
+                val convergeR = (ringOuterRadius() * 0.45).coerceIn(6.0, 18.0)
+                for (k in 0 until 8) {
+                    val ang = random.nextDouble() * Math.PI * 2.0
+                    val sx = origin.x + cos(ang) * convergeR
+                    val sy = origin.y + (random.nextDouble() - 0.5) * 6.0
+                    val sz = origin.z + sin(ang) * convergeR
+                    UrCircleHexVfx.spawnConjure(
+                        level(),
+                        if (k % 2 == 0) UrCircleHexVfx.WAVE_GOLD else UrCircleHexVfx.MEDIA_PURPLE,
+                        sx, sy, sz,
+                        (origin.x - sx) * 0.09,
+                        (origin.y - sy) * 0.09,
+                        (origin.z - sz) * 0.09,
+                    )
+                }
+            }
         } else {
-            setDeltaMovement(deltaMovement.scale(0.85))
-        }
-        if (stateTicks % 4 == 0) {
-            val origin = beamOrigin()
-            val r = ringOuterRadius()
-            UrCircleHexVfx.spawnGroundCircle(level(), origin, r * 0.75, UrCircleHexVfx.WAVE_GOLD, points = 24)
-            UrCircleHexVfx.spawnGroundCircle(level(), origin, r, UrCircleHexVfx.MEDIA_PURPLE, points = 32)
+            targetFoldProgress = 0.0F
+            if (stateTicks == PHASE_BURST_TICK) {
+                foldProgress = 0.0F
+                val r = ringOuterRadius()
+                UrCircleHexVfx.playRingSound(level(), origin, r, HexSounds.CAST_THOTH, 3.6F, 0.65F)
+                UrCircleHexVfx.playRingSound(level(), origin, r, SoundEvents.END_PORTAL_SPAWN, 3.0F, 0.8F)
+                UrCircleHexVfx.playRingSound(level(), origin, r, SoundEvents.BEACON_ACTIVATE, 2.8F, 0.7F)
+                for (k in 0 until 48) {
+                    UrCircleHexVfx.spawnConjure(
+                        level(),
+                        if (k % 3 == 0) UrCircleHexVfx.WAVE_GOLD else UrCircleHexVfx.BEAM_LAVENDER,
+                        origin.x, origin.y, origin.z,
+                        (random.nextDouble() - 0.5) * 1.4,
+                        (random.nextDouble() - 0.5) * 0.9,
+                        (random.nextDouble() - 0.5) * 1.4,
+                    )
+                }
+                val waveBox = AABB(origin, origin).inflate(28.0)
+                for (victim in level().getEntitiesOfClass(LivingEntity::class.java, waveBox)) {
+                    if (victim === this || victim is Enemy || isUrCircleAlly(victim)) continue
+                    val kb = victim.position().subtract(origin)
+                    val len = kb.length().coerceAtLeast(0.1)
+                    victim.push(kb.x / len * 1.35, 0.45, kb.z / len * 1.35)
+                }
+            }
+            if (stateTicks < 56) {
+                setDeltaMovement(0.0, 0.24, 0.0)
+            } else {
+                setDeltaMovement(deltaMovement.scale(0.85))
+            }
+            if (stateTicks % 4 == 0) {
+                val r = ringOuterRadius()
+                UrCircleHexVfx.spawnGroundCircle(level(), origin, r * 0.75, UrCircleHexVfx.WAVE_GOLD, points = 28)
+                UrCircleHexVfx.spawnGroundCircle(level(), origin, r, UrCircleHexVfx.MEDIA_PURPLE, points = 36)
+            }
         }
         if (stateTicks >= PHASE_TRANSITION_TICKS) {
             circleState = CircleState.CRUISE
@@ -922,7 +1021,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         currentSkill = null
         beamSkill = null
         grindSkill = null
-        targetFoldProgress = 0.0F
+        targetFoldProgress = 1.0F
         mediaWave.clear(this)
         setSiphoning(false)
         setPlaneSlicing(false, 0.0F)
@@ -930,8 +1029,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         discardAnchors()
         circleState = CircleState.PHASE_TRANSITION
         stateTicks = 0
-        UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), HexSounds.CAST_THOTH, 3.0F, 0.75F)
-        notifyNearbyPlayers(Component.translatable("message.hexmob.ur_circle.phase2"))
+        UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), SoundEvents.BEACON_POWER_SELECT, 3.0F, 0.65F)
     }
 
     fun triggerShortCircuit() {
@@ -962,18 +1060,18 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         skillCooldown = SKILL_COOLDOWN
 
         val origin = beamOrigin()
-        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.SPELL_CIRCLE_FAIL, 2.5F, 0.9F)
-        for (k in 0 until 28) {
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.SPELL_CIRCLE_FAIL, 2.8F, 0.85F)
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), SoundEvents.GLASS_BREAK, 2.2F, 0.75F)
+        for (k in 0 until 32) {
             UrCircleHexVfx.spawnConjure(
                 level(),
                 UrCircleHexVfx.SHORT_CIRCUIT_RED,
                 origin.x, origin.y, origin.z,
-                (random.nextDouble() - 0.5) * 0.45,
-                (random.nextDouble() - 0.5) * 0.45,
-                (random.nextDouble() - 0.5) * 0.45,
+                (random.nextDouble() - 0.5) * 0.55,
+                (random.nextDouble() - 0.5) * 0.55,
+                (random.nextDouble() - 0.5) * 0.55,
             )
         }
-        notifyNearbyPlayers(Component.translatable("message.hexmob.ur_circle.short_circuit"))
 
         if (phase == 1 && health <= maxHealth * 0.5F) {
             beginPhase2Transition()
@@ -986,6 +1084,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         if (phase >= 2) {
             when (ringIndex) {
                 2 -> 0
+                5 -> 0
+                4 -> 1
                 3 -> 1
                 1 -> 2
                 else -> 3
@@ -993,6 +1093,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         } else {
             when (ringIndex) {
                 1 -> 0
+                3 -> 0
                 else -> 1
             }
         }
@@ -1020,6 +1121,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     private fun runDeathSequence() {
         setDeltaMovement(deltaMovement.scale(0.85))
         val t = stateTicks
+
+        // 1. 失控暴走期与逐环崩碎波次
         for (ring in rings) {
             if (!ring.isVisible(phase, phase2Reveal)) continue
             for (part in ring.parts) {
@@ -1028,6 +1131,31 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 }
             }
         }
+
+        // 2. 临界坍缩期：残余核心内收、强能量倒吸、高频蜂鸣
+        if (t == DEATH_COLLAPSE_TICK) {
+            targetFoldProgress = 1.0F
+            UrCircleHexVfx.playRingSound(level(), beamOrigin(), ringOuterRadius(), SoundEvents.BEACON_POWER_SELECT, 3.2F, 0.55F)
+        }
+        if (t in (DEATH_COLLAPSE_TICK - 10) until CORE_BREAK_TICK && t % 2 == 0) {
+            val origin = beamOrigin()
+            val convergeR = (10.0 + (CORE_BREAK_TICK - t) * 0.45).coerceAtLeast(3.0)
+            for (k in 0 until 6) {
+                val ang = random.nextDouble() * Math.PI * 2.0
+                val sx = origin.x + cos(ang) * convergeR
+                val sy = origin.y + (random.nextDouble() - 0.5) * 10.0
+                val sz = origin.z + sin(ang) * convergeR
+                UrCircleHexVfx.spawnConjure(
+                    level(),
+                    if (k % 2 == 0) UrCircleHexVfx.WAVE_GOLD else UrCircleHexVfx.BEAM_LAVENDER,
+                    sx, sy, sz,
+                    (origin.x - sx) * 0.12,
+                    (origin.y - sy) * 0.12,
+                    (origin.z - sz) * 0.12,
+                )
+            }
+        }
+
         if (t == CORE_BREAK_TICK) {
             spawnCoreBreak()
         }
@@ -1041,41 +1169,54 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val pos = part.posNow
         if (pos == Vec3.ZERO) return
         val particle = if (isSlate) SLATE_BREAK else STONE_BREAK
-        for (k in 0 until 14) {
+        for (k in 0 until 16) {
             spawnParticle(
                 level, particle,
                 pos.x, pos.y, pos.z,
-                (random.nextDouble() - 0.5) * 0.5, random.nextDouble() * 0.5, (random.nextDouble() - 0.5) * 0.5,
+                (random.nextDouble() - 0.5) * 0.65, random.nextDouble() * 0.6, (random.nextDouble() - 0.5) * 0.65,
                 UrCircleHexVfx.DEFAULT_RANGE,
             )
         }
-        UrCircleHexVfx.spawnConjure(level, UrCircleHexVfx.MEDIA_PURPLE, pos.x, pos.y, pos.z, 0.0, 0.12, 0.0)
-        UrCircleHexVfx.playRingSound(level, pos, ringOuterRadius(), SoundEvents.STONE_BREAK, 1.2F, 1.1F)
+        UrCircleHexVfx.spawnConjure(level, UrCircleHexVfx.MEDIA_PURPLE, pos.x, pos.y, pos.z, 0.0, 0.16, 0.0)
+        UrCircleHexVfx.playRingSound(level, pos, ringOuterRadius(), SoundEvents.STONE_BREAK, 1.4F, 0.9F + part.ringIndex * 0.1F)
     }
 
     private fun spawnCoreBreak() {
         val level = level()
         var pos = earth.posNow
         if (pos == Vec3.ZERO) pos = position().add(0.0, bbHeight / 2.0, 0.0)
-        for (k in 0 until 40) {
+        for (k in 0 until 84) {
             spawnParticle(
                 level, AMETHYST_BREAK,
-                pos.x + (random.nextDouble() - 0.5) * 2.0,
-                pos.y + (random.nextDouble() - 0.5) * 2.0,
-                pos.z + (random.nextDouble() - 0.5) * 2.0,
-                (random.nextDouble() - 0.5) * 0.4, random.nextDouble() * 0.4, (random.nextDouble() - 0.5) * 0.4,
+                pos.x + (random.nextDouble() - 0.5) * 3.0,
+                pos.y + (random.nextDouble() - 0.5) * 3.0,
+                pos.z + (random.nextDouble() - 0.5) * 3.0,
+                (random.nextDouble() - 0.5) * 0.85, random.nextDouble() * 0.75, (random.nextDouble() - 0.5) * 0.85,
                 UrCircleHexVfx.DEFAULT_RANGE,
             )
             UrCircleHexVfx.spawnConjure(
                 level,
-                UrCircleHexVfx.WAVE_GOLD,
+                if (k % 2 == 0) UrCircleHexVfx.WAVE_GOLD else UrCircleHexVfx.MEDIA_PURPLE,
                 pos.x, pos.y, pos.z,
-                (random.nextDouble() - 0.5) * 0.5,
-                (random.nextDouble() - 0.5) * 0.5,
-                (random.nextDouble() - 0.5) * 0.5,
+                (random.nextDouble() - 0.5) * 1.35,
+                (random.nextDouble() - 0.5) * 1.1,
+                (random.nextDouble() - 0.5) * 1.35,
             )
+            if (k % 3 == 0) {
+                spawnParticle(
+                    level, ParticleTypes.END_ROD,
+                    pos.x, pos.y, pos.z,
+                    (random.nextDouble() - 0.5) * 1.2,
+                    (random.nextDouble() - 0.2) * 1.1,
+                    (random.nextDouble() - 0.5) * 1.2,
+                    UrCircleHexVfx.DEFAULT_RANGE,
+                )
+            }
         }
-        UrCircleHexVfx.playRingSound(level, pos, ringOuterRadius(), HexSounds.CAST_THOTH, 2.5F, 0.85F)
+        spawnParticle(level, ParticleTypes.EXPLOSION_EMITTER, pos.x, pos.y, pos.z, 0.0, 0.0, 0.0, UrCircleHexVfx.DEFAULT_RANGE)
+        UrCircleHexVfx.playRingSound(level, pos, ringOuterRadius(), SoundEvents.GENERIC_EXPLODE, 4.0F, 0.65F)
+        UrCircleHexVfx.playRingSound(level, pos, ringOuterRadius(), HexSounds.CAST_THOTH, 3.6F, 0.7F)
+        UrCircleHexVfx.playRingSound(level, pos, ringOuterRadius(), SoundEvents.END_PORTAL_SPAWN, 3.0F, 0.9F)
     }
 
     private fun finishDeath() {
@@ -1138,8 +1279,18 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     }
 
     override fun getAllParts(): List<UrCirclePart> = cachedAllParts
-    override fun getPartsBoundingBox(): AABB = AABB(position(), position()).inflate(ringOuterRadius() + 6.0)
+    override fun getPartsBoundingBox(): AABB {
+        val r = if (phase >= 2) maxOf(ringOuterRadius() * 1.7, 210.0) else maxOf(ringOuterRadius() + 24.0, 96.0)
+        val yUp = if (phase >= 2) maxOf(r * 0.9, 170.0) else r
+        val yDown = if (phase >= 2) maxOf(r * 0.7, 150.0) else r * 0.85
+        val c = position().add(0.0, bbHeight * 0.5, 0.0)
+        return AABB(c.x - r, c.y - yDown, c.z - r, c.x + r, c.y + yUp, c.z + r)
+    }
     override fun getBoundingBoxForCulling(): AABB = getPartsBoundingBox()
+    override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
+        val maxDist = if (phase >= 2) 420.0 else 280.0
+        return distance <= maxDist * maxDist
+    }
     override fun shouldRecord(): Boolean = isAlive
 
     override fun addEffect(effectInstance: MobEffectInstance, entity: Entity?): Boolean =
@@ -1190,18 +1341,18 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         setSiphoning(false)
         siphonTimer = 0
         val origin = beamOrigin()
-        for (k in 0 until 24) {
+        for (k in 0 until 32) {
             UrCircleHexVfx.spawnConjure(
                 level(),
                 UrCircleHexVfx.SIPHON_CYAN,
                 origin.x, origin.y, origin.z,
-                (random.nextDouble() - 0.5) * 0.4,
-                (random.nextDouble() - 0.5) * 0.4,
-                (random.nextDouble() - 0.5) * 0.4,
+                (random.nextDouble() - 0.5) * 0.55,
+                (random.nextDouble() - 0.5) * 0.55,
+                (random.nextDouble() - 0.5) * 0.55,
             )
         }
-        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.ABACUS, 2.0F, 1.4F)
-        notifyNearbyPlayers(Component.translatable("message.hexmob.ur_circle.siphon_broken"))
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.ABACUS, 2.2F, 1.4F)
+        UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), SoundEvents.GLASS_BREAK, 2.2F, 0.75F)
     }
 
     override fun hurt(source: DamageSource, amount: Float): Boolean {
@@ -1374,9 +1525,6 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             serverLevel.addFreshEntity(anchor)
             activeAnchors.add(anchor)
         }
-        if (activeAnchors.isNotEmpty()) {
-            notifyNearbyPlayers(Component.translatable("message.hexmob.ur_circle.anchor_spawned"))
-        }
     }
 
     private fun findAnchorY(level: Level, x: Double, refY: Double, z: Double): Double {
@@ -1393,7 +1541,6 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     fun onAnchorBroken(anchor: UrCircleAnchorEntity) {
         activeAnchors.remove(anchor)
         discardAnchors()
-        notifyNearbyPlayers(Component.translatable("message.hexmob.ur_circle.anchor_broken"))
         triggerShortCircuit()
     }
 
@@ -1563,16 +1710,6 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         healSelf(20.0F)
         UrCircleHexVfx.playRingSound(level(), origin, ringOuterRadius(), HexSounds.CAST_FAILURE, 2.0F, 0.9F)
         UrCircleMishap.throwAt(player, UrCircleStatusTable.randomMishap(this, random))
-        player.displayClientMessage(Component.translatable("message.hexmob.ur_circle.siphon_backlash"), true)
-    }
-
-    private fun notifyNearbyPlayers(message: Component) {
-        val serverLevel = level() as? ServerLevel ?: return
-        for (p in serverLevel.players()) {
-            if (p.distanceToSqr(this) <= 64.0 * 64.0) {
-                p.displayClientMessage(message, true)
-            }
-        }
     }
 
     // ---- 调试命令入口 ----
@@ -1623,6 +1760,43 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         siphonTimer = 0
     }
 
+    fun forceSetHealth(newHp: Float) {
+        internalHealthWrite = true
+        try {
+            setHealth(newHp.coerceIn(1.0F, maxHealth))
+        } finally {
+            internalHealthWrite = false
+        }
+    }
+
+    fun forceResetCooldown(ticks: Int = 0) {
+        skillCooldown = ticks.coerceAtLeast(0)
+    }
+
+    fun forceTriggerTransition() {
+        interruptChannel()
+        dormant = false
+        wokenOnce = true
+        entityData.set(DORMANT, false)
+        dormantFold = 0.0F
+        phase = 1
+        phase2Reveal = 0.0F
+        beginPhase2Transition()
+    }
+
+    fun forceTriggerDeath() {
+        dormant = false
+        wokenOnce = true
+        entityData.set(DORMANT, false)
+        die(level().damageSources().generic())
+    }
+
+    fun debugSummary(): String =
+        "phase=$phase state=$circleState($stateTicks) hp=${"%.1f".format(health)}/${"%.0f".format(maxHealth)} " +
+            "reveal=${"%.2f".format(phase2Reveal)} fold=${"%.2f".format(foldProgress)} dormant=$dormant " +
+            "outerR=${"%.1f".format(ringOuterRadius())} rings=${rings.size} parts=${cachedAllParts.size} " +
+            "servants=${livingServants()}(dmg*${"%.2f".format(servantDamageMultiplier())}) anchors=${activeAnchors.size}"
+
     override fun recreateFromPacket(packet: ClientboundAddEntityPacket) {
         super.recreateFromPacket(packet)
         val parts: List<UrCirclePart> = getAllParts()
@@ -1636,6 +1810,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val ECLIPTIC_ROTATION: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
         val ROT_OUTER: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
         val ROT_POLAR: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val ROT_ZENITH: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val ROT_APEX: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
         val STATE: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
         val STATE_TICKS: EntityDataAccessor<Int> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.INT)
         val TUMBLING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.BOOLEAN)
@@ -1655,7 +1831,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val CONTACT_DAMAGE = 6.0F
         const val CONTACT_COOLDOWN = 20
         const val FIRE_INTERVAL = 50
-        const val SLATE_SPEED = 1.0F
+        const val SLATE_SPEED = 1.95F
         const val MIN_FIRE_INTERVAL = 12
         const val MAX_VOLLEY = 3
         const val WINDUP_TICKS = 20
@@ -1665,8 +1841,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val CHARGE_COOLDOWN = 100
         const val GROUND_CRATER_COOLDOWN = 40
         const val AMBIENT_SOUND_INTERVAL = 100
-        const val BOSS_BAR_RANGE = 128.0
-        const val WAKE_RANGE = 24.0
+        const val BOSS_BAR_RANGE = 300.0
+        const val WAKE_RANGE = 42.0
         const val ARENA_CHECK_MAX_TICKS = 60
         const val SKILL_COOLDOWN = 90
         const val CHANNEL_PARTICLE_INTERVAL = 4
@@ -1680,11 +1856,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val SIPHON_INTERVAL = 260
         const val SIPHON_DURATION = 120
 
-        const val PHASE_TRANSITION_TICKS = 55
+        const val PHASE_BURST_TICK = 28
+        const val PHASE_TRANSITION_TICKS = 80
         const val SHORT_CIRCUIT_TICKS = 100
         const val SHORT_CIRCUIT_DAMAGE = 25.0F
 
-        const val HATE_RANGE = 128.0
+        const val HATE_RANGE = 300.0
         const val SERVANT_DEATH_DAMAGE = 5.0F
         const val CHANNEL_TUMBLE_SPEED = 5.0F
 
@@ -1694,10 +1871,11 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val DPS_CAP_PER_WINDOW = 70.0F
         const val FIRE_DAMAGE_MULTIPLIER = 0.1F
 
-        const val SPIN_UP_TICKS = 30
-        const val SPIN_DOWN_END = 85
-        const val CORE_BREAK_TICK = 128
-        const val DEATH_END_TICK = 140
+        const val SPIN_UP_TICKS = 35
+        const val SPIN_DOWN_END = 95
+        const val DEATH_COLLAPSE_TICK = 100
+        const val CORE_BREAK_TICK = 136
+        const val DEATH_END_TICK = 165
 
         val SLATE_BREAK = BlockParticleOption(ParticleTypes.BLOCK, HexBlocks.SLATE.defaultBlockState())
         val STONE_BREAK = BlockParticleOption(ParticleTypes.BLOCK, Blocks.STONE.defaultBlockState())

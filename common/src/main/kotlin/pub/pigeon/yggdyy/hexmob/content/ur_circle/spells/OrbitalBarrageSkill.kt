@@ -89,6 +89,6 @@ class OrbitalBarrageSkill : UrCircleSkill("orbital_barrage", CHANNEL_TICKS) {
         const val CHANNEL_TICKS = 55
         const val STRIKE_COUNT_PHASE1 = 4
         const val STRIKE_COUNT_PHASE2 = 8
-        const val PROJECTILE_SPEED = 1.15F
+        const val PROJECTILE_SPEED = 2.1F
     }
 }

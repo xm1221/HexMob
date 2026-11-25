@@ -105,15 +105,6 @@
       "everything_in_now": {
         "insufficient_media": "媒质不足。",
         "enlightened": "你已被授予启迪。"
-      },
-      "ur_circle": {
-        "phase2": "大环展开了卓伟的巨构——二阶段开启！",
-        "short_circuit": "媒质波节点被击破，大环法术环发生断路！",
-        "siphon_start": "大环张开了媒质虹吸场！改用间接施法或等待其消退。",
-        "siphon_broken": "间接法术击碎了大环的媒质虹吸场！",
-        "siphon_backlash": "大环的媒质虹吸反噬了你的施法！",
-        "anchor_spawned": "大环降下了接地促动石锚点——打碎它可使其高空断路！",
-        "anchor_broken": "接地锚点碎裂，高空大环发生断路坠落！"
       }
     }
   },

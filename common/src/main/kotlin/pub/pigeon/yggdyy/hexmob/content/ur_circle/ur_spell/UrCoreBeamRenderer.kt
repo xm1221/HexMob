@@ -118,6 +118,54 @@ class UrCoreBeamRenderer(context: EntityRendererProvider.Context) : EntityRender
         drawStarburst(lightning, m4, length - 0.05F, radius * 2.4F, -t * 0.25F, cr, cg, cb, 220)
 
         poseStack.popPose()
+
+        // 5. 世界空间水平落点灼烧星阵（激活粗光束时）
+        if (radius >= 0.45F) {
+            drawImpactGroundRing(
+                buffer.getBuffer(RenderType.lightning()),
+                poseStack.last().pose(),
+                x, y, z,
+                radius * 2.2F,
+                t * 0.18F,
+                cr, cg, cb,
+            )
+        }
+    }
+
+    private fun drawImpactGroundRing(
+        consumer: VertexConsumer,
+        m4: Matrix4f,
+        cx: Float,
+        cy: Float,
+        cz: Float,
+        radius: Float,
+        rot: Float,
+        r: Int,
+        g: Int,
+        b: Int,
+    ) {
+        val segs = 24
+        val inR = (radius - 0.22F).coerceAtLeast(0.15F)
+        val outR = radius + 0.22F
+        val gy = cy + 0.06F
+        for (k in 0 until segs) {
+            val a0 = rot + k * 6.2831855F / segs
+            val a1 = rot + (k + 1) * 6.2831855F / segs
+            val c0 = cos(a0.toDouble()).toFloat()
+            val s0 = sin(a0.toDouble()).toFloat()
+            val c1 = cos(a1.toDouble()).toFloat()
+            val s1 = sin(a1.toDouble()).toFloat()
+
+            consumer.vertex(m4, cx + c0 * inR, gy, cz + s0 * inR).color(255, 225, 145, 220).endVertex()
+            consumer.vertex(m4, cx + c0 * outR, gy, cz + s0 * outR).color(r, g, b, 220).endVertex()
+            consumer.vertex(m4, cx + c1 * outR, gy, cz + s1 * outR).color(r, g, b, 220).endVertex()
+            consumer.vertex(m4, cx + c1 * inR, gy, cz + s1 * inR).color(255, 225, 145, 220).endVertex()
+
+            consumer.vertex(m4, cx + c1 * inR, gy, cz + s1 * inR).color(255, 225, 145, 220).endVertex()
+            consumer.vertex(m4, cx + c1 * outR, gy, cz + s1 * outR).color(r, g, b, 220).endVertex()
+            consumer.vertex(m4, cx + c0 * outR, gy, cz + s0 * outR).color(r, g, b, 220).endVertex()
+            consumer.vertex(m4, cx + c0 * inR, gy, cz + s0 * inR).color(255, 225, 145, 220).endVertex()
+        }
     }
 
     private fun drawCylinder(

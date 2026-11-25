@@ -29,7 +29,7 @@ object HexMobServerConfig {
 
     /** 大环体积倍率上下限。 */
     const val MIN_UR_CIRCLE_SCALE = 0.25F
-    const val MAX_UR_CIRCLE_SCALE = 16.0F
+    const val MAX_UR_CIRCLE_SCALE = 24.0F
 
     /** 命令热调整大环体积倍率：改值 → 落盘 → 广播给所有在线玩家（客户端渲染同步）。 */
     @JvmStatic

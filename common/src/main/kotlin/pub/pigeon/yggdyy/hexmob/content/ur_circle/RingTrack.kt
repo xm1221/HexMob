@@ -17,6 +17,8 @@ enum class RingKind {
     ECLIPTIC_SLATE,
     OUTER_SLATE,
     POLAR_IMPETUS,
+    ZENITH_SLATE,
+    APEX_IMPETUS,
 }
 
 /**
@@ -107,7 +109,7 @@ object RingTrackFactory {
     fun buildAll(circle: UrCircleEntity): BuiltCircleGeometry {
         var nextGlobal = 0
 
-        val innerParts = IMPETUS_VARIANTS.map { (path, variant) ->
+        val innerParts = IMPETUS_VARIANTS.take(12).map { (path, variant) ->
             CubePart(circle, HexAPI.modLoc(path), variant).also {
                 it.ringIndex = 0
                 it.globalIndex = nextGlobal++
@@ -116,19 +118,20 @@ object RingTrackFactory {
         val innerTrack = RingTrack(
             kind = RingKind.INNER_IMPETUS,
             ringIndex = 0,
-            baseRadius = 4.0,
-            baseTiltDeg = -22F,
+            baseRadius = 7.5,
+            baseTiltDeg = -20F,
             tiltAzimuthDeg = 0F,
             spinDir = -1F,
-            spinSpeedMul = 1.0F,
-            partScale = 1.0F,
+            spinSpeedMul = 1.7F,
+            partScale = 1.8F,
             unlockPhase = 1,
             parts = innerParts,
             faceTangent = true,
-            haloWidth = 1.2F,
+            haloWidth = 2.2F,
         )
 
-        val eclipticParts = CLASSIC_PATTERNS.map { pat ->
+        val eclipticParts = (0 until 14).map { idx ->
+            val pat = CLASSIC_PATTERNS[idx % CLASSIC_PATTERNS.size]
             SlatePart(circle, pat).also {
                 it.ringIndex = 1
                 it.globalIndex = nextGlobal++
@@ -137,19 +140,19 @@ object RingTrackFactory {
         val eclipticTrack = RingTrack(
             kind = RingKind.ECLIPTIC_SLATE,
             ringIndex = 1,
-            baseRadius = 6.0,
-            baseTiltDeg = 22F,
+            baseRadius = 14.0,
+            baseTiltDeg = 38F,
             tiltAzimuthDeg = 0F,
             spinDir = 1F,
-            spinSpeedMul = 1.0F,
-            partScale = 1.0F,
+            spinSpeedMul = 0.65F,
+            partScale = 2.6F,
             unlockPhase = 1,
             parts = eclipticParts,
             faceTangent = false,
-            haloWidth = 1.8F,
+            haloWidth = 3.8F,
         )
 
-        val outerParts = (0 until 32).map { idx ->
+        val outerParts = (0 until 20).map { idx ->
             val pat = CLASSIC_PATTERNS[idx % CLASSIC_PATTERNS.size]
             SlatePart(circle, pat).also {
                 it.ringIndex = 2
@@ -159,19 +162,19 @@ object RingTrackFactory {
         val outerTrack = RingTrack(
             kind = RingKind.OUTER_SLATE,
             ringIndex = 2,
-            baseRadius = 12.5,
-            baseTiltDeg = 14F,
-            tiltAzimuthDeg = 45F,
+            baseRadius = 29.0,
+            baseTiltDeg = 4F,
+            tiltAzimuthDeg = 20F,
             spinDir = 1F,
-            spinSpeedMul = 0.85F,
-            partScale = 1.45F,
+            spinSpeedMul = 0.14F,
+            partScale = 3.6F,
             unlockPhase = 2,
             parts = outerParts,
             faceTangent = false,
-            haloWidth = 3.2F,
+            haloWidth = 7.5F,
         )
 
-        val polarParts = (0 until 20).map { idx ->
+        val polarParts = (0 until 16).map { idx ->
             val (path, variant) = IMPETUS_VARIANTS[(idx * 3) % IMPETUS_VARIANTS.size]
             CubePart(circle, HexAPI.modLoc(path), variant).also {
                 it.ringIndex = 3
@@ -181,16 +184,60 @@ object RingTrackFactory {
         val polarTrack = RingTrack(
             kind = RingKind.POLAR_IMPETUS,
             ringIndex = 3,
-            baseRadius = 9.0,
-            baseTiltDeg = 76F,
-            tiltAzimuthDeg = -30F,
+            baseRadius = 10.8,
+            baseTiltDeg = -36F,
+            tiltAzimuthDeg = -35F,
             spinDir = -1F,
-            spinSpeedMul = 1.6F,
-            partScale = 1.15F,
+            spinSpeedMul = 1.0F,
+            partScale = 2.1F,
             unlockPhase = 2,
             parts = polarParts,
             faceTangent = true,
-            haloWidth = 1.6F,
+            haloWidth = 3.0F,
+        )
+
+        val zenithParts = (0 until 14).map { idx ->
+            val pat = CLASSIC_PATTERNS[(idx * 5) % CLASSIC_PATTERNS.size]
+            SlatePart(circle, pat).also {
+                it.ringIndex = 4
+                it.globalIndex = nextGlobal++
+            }
+        }
+        val zenithTrack = RingTrack(
+            kind = RingKind.ZENITH_SLATE,
+            ringIndex = 4,
+            baseRadius = 21.0,
+            baseTiltDeg = 72F,
+            tiltAzimuthDeg = -55F,
+            spinDir = -1F,
+            spinSpeedMul = 0.42F,
+            partScale = 3.0F,
+            unlockPhase = 2,
+            parts = zenithParts,
+            faceTangent = false,
+            haloWidth = 4.5F,
+        )
+
+        val apexParts = (0 until 16).map { idx ->
+            val (path, variant) = IMPETUS_VARIANTS[(idx * 5) % IMPETUS_VARIANTS.size]
+            CubePart(circle, HexAPI.modLoc(path), variant).also {
+                it.ringIndex = 5
+                it.globalIndex = nextGlobal++
+            }
+        }
+        val apexTrack = RingTrack(
+            kind = RingKind.APEX_IMPETUS,
+            ringIndex = 5,
+            baseRadius = 25.0,
+            baseTiltDeg = -18F,
+            tiltAzimuthDeg = 75F,
+            spinDir = -1F,
+            spinSpeedMul = 0.28F,
+            partScale = 2.5F,
+            unlockPhase = 2,
+            parts = apexParts,
+            faceTangent = true,
+            haloWidth = 3.8F,
         )
 
         val earth = CubePart(circle, HexMob.id("cube"), 2F, 2F, HexMob.id("ur_circle_core"), "").also {
@@ -198,7 +245,7 @@ object RingTrackFactory {
             it.globalIndex = nextGlobal++
         }
 
-        val rings = listOf(innerTrack, eclipticTrack, outerTrack, polarTrack)
+        val rings = listOf(innerTrack, eclipticTrack, outerTrack, polarTrack, zenithTrack, apexTrack)
         val allParts = buildList {
             for (ring in rings) addAll(ring.parts)
             add(earth)

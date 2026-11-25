@@ -21,7 +21,7 @@ object UrCircleHexVfx {
     const val BEAM_LAVENDER = 0xFF_E4C2FF.toInt()
     const val AMETHYST_VIOLET = 0xFF_C77DFF.toInt()
 
-    const val DEFAULT_RANGE = 128.0
+    const val DEFAULT_RANGE = 320.0
 
     private val PENTATONIC_SEMITONES = intArrayOf(0, 2, 4, 7, 9, 12, 14, 16)
 
@@ -90,7 +90,7 @@ object UrCircleHexVfx {
         pitch: Float = 1.0F,
     ) {
         if (level.isClientSide) return
-        val vol = (outerRadius / 10.0).toFloat().coerceIn(baseVolume, 6.0F)
+        val vol = (outerRadius / 10.0).toFloat().coerceIn(baseVolume, 18.0F)
         level.playSound(null, BlockPos.containing(pos), sound, SoundSource.HOSTILE, vol, pitch)
     }
 

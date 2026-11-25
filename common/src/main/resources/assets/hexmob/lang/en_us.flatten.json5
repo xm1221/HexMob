@@ -121,15 +121,6 @@
       "everything_in_now": {
         "insufficient_media": "Not enough media.",
         "enlightened": "You have been granted Enlightenment."
-      },
-      "ur_circle": {
-        "phase2": "The Ur Circle unfolds its grand form — Phase II begins!",
-        "short_circuit": "Media wave node shattered — the Ur Circle's spell loop short-circuits!",
-        "siphon_start": "The Ur Circle raises a Media Siphon field! Switch to indirect casting or wait it out.",
-        "siphon_broken": "Indirect sorcery shatters the Ur Circle's Media Siphon field!",
-        "siphon_backlash": "The Ur Circle's Media Siphon backlashes against your cast!",
-        "anchor_spawned": "The Ur Circle lowered a Grounded Impetus Anchor — shatter it to short-circuit the ring!",
-        "anchor_broken": "Grounded Anchor shattered — the Ur Circle crashes down in short-circuit!"
       }
     }
   },

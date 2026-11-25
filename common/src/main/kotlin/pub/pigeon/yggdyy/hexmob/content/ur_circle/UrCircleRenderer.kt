@@ -65,12 +65,12 @@ class UrCircleRenderer(val context: EntityRendererProvider.Context) : EntityRend
             poseStack.popPose()
         }
 
-        UrCircleVfxRenderer.renderCircleVfx(entity, partialTick, poseStack, buffer)
+        UrCircleVfxRenderer.renderCircleVfx(entity, partialTick, ix, iy, iz, poseStack, buffer, packedLight)
     }
 
     companion object {
-        const val LOD_MID_DISTANCE = 72.0
-        const val LOD_FAR_DISTANCE = 140.0
+        const val LOD_MID_DISTANCE = 190.0
+        const val LOD_FAR_DISTANCE = 360.0
 
         val renderers: MutableList<PartRenderer> = mutableListOf(
             CubeRenderer(HexMob.id("cube")),
