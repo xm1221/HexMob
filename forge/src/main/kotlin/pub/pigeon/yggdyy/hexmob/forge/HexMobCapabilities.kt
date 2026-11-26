@@ -29,7 +29,9 @@ object HexMobCapabilities {
     private fun attachEntityCaps(event: AttachCapabilitiesEvent<Entity>) {
         val entity = event.`object`
         if (entity is IotaEntity) {
-            event.addCapability(IOTA_STORAGE_CAP, IotaHolderProvider(entity))
+            val provider = IotaHolderProvider(entity)
+            event.addCapability(IOTA_STORAGE_CAP, provider)
+            event.addListener { provider.invalidate() }
         }
     }
 
@@ -39,5 +41,9 @@ object HexMobCapabilities {
 
         override fun <T> getCapability(cap: Capability<T>, side: Direction?): LazyOptional<T> =
             if (cap == HexCapabilities.IOTA) lazy.cast() else LazyOptional.empty()
+
+        fun invalidate() {
+            lazy.invalidate()
+        }
     }
 }

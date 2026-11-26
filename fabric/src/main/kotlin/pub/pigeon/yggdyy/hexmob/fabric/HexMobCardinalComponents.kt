@@ -30,17 +30,12 @@ object HexMobCardinalComponents : EntityComponentInitializer {
     private class EntityIotaHolderComponent(
         private val entity: IotaEntity,
     ) : CCIotaHolder {
-        override fun readIotaTag(): CompoundTag? = entity.getIotaNbt()
+        override fun readIotaTag(): CompoundTag? = entity.readIotaTag()
 
-        override fun writeable(): Boolean = true
+        override fun writeable(): Boolean = entity.writeable()
 
-        override fun writeIota(iota: Iota?, simulate: Boolean): Boolean {
-            if (iota == null) return writeable()
-            if (!simulate) {
-                entity.writeIota(iota)
-            }
-            return true
-        }
+        override fun writeIota(iota: Iota?, simulate: Boolean): Boolean =
+            entity.writeIota(iota, simulate)
 
         // Storage lives on the entity (entityData / its own NBT), not on the
         // component's tag, so the component's serialization hooks are no-ops.

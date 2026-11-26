@@ -27,6 +27,12 @@ object UrCircleBossBarRenderer {
     private const val CHIP_H = 13
 
     @JvmStatic
+    fun extraBarHeight(event: BossEvent): Int {
+        val snap = UrCircleHudTracker.getByBossEvent(event.id) ?: return 0
+        return if (snap.packet.slates.isNotEmpty()) 26 else 12
+    }
+
+    @JvmStatic
     fun tryRenderCustomBar(guiGraphics: GuiGraphics, x: Int, y: Int, event: BossEvent): Boolean {
         val snap = UrCircleHudTracker.getByBossEvent(event.id) ?: return false
         val pkt = snap.packet
@@ -43,6 +49,7 @@ object UrCircleBossBarRenderer {
 
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F)
 
         // 1. 贴图外框冠饰底板（196×24）
         val frameV = when {
@@ -150,7 +157,19 @@ object UrCircleBossBarRenderer {
                     slate.tamperable -> 0xFF_72FFF6.toInt()
                     else -> 0xFF_EFE4FF.toInt()
                 }
-                guiGraphics.drawString(font, stateComp, cx + 13, rowY + 2, textCol, false)
+                val maxLabelW = CHIP_W - 15
+                val labelW = font.width(stateComp)
+                if (labelW > maxLabelW && maxLabelW > 0) {
+                    val textScale = maxLabelW.toFloat() / labelW.toFloat()
+                    val pose = guiGraphics.pose()
+                    pose.pushPose()
+                    pose.translate((cx + 13).toDouble(), (rowY + 2).toDouble(), 0.0)
+                    pose.scale(textScale, textScale, 1.0F)
+                    guiGraphics.drawString(font, stateComp, 0, 0, textCol, false)
+                    pose.popPose()
+                } else {
+                    guiGraphics.drawString(font, stateComp, cx + 13, rowY + 2, textCol, false)
+                }
 
                 val pw = Mth.floor(40.0F * slate.progress.coerceIn(0F, 1F)).coerceIn(0, 40)
                 if (pw > 0) {
@@ -164,7 +183,7 @@ object UrCircleBossBarRenderer {
             }
         }
 
-        RenderSystem.disableBlend()
+        // 保持启用混合状态，避免污染后续 Boss 血条与原版 HUD 绘制
         return true
     }
 }

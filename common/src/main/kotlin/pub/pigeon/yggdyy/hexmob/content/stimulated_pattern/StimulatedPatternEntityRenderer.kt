@@ -9,7 +9,6 @@ import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
 import pub.pigeon.yggdyy.hexmob.HexMob
 
@@ -28,9 +27,21 @@ class StimulatedPatternEntityRenderer(context: EntityRendererProvider.Context) :
         packedLight: Int
     ) {
         super.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight)
-        val delta: Vec3 = Minecraft.getInstance().player?.eyePosition?.subtract(entity.position().add(0.0, 0.5, 0.0))?.multiply(1.0, 0.0, 1.0)?.normalize() ?: return
+        val player = Minecraft.getInstance().player ?: return
+        val raw = player.eyePosition.subtract(entity.position().add(0.0, 0.5, 0.0)).multiply(1.0, 0.0, 1.0)
+        val lenSq = raw.lengthSqr()
+        val rot = if (lenSq <= 1.0E-8) {
+            Quaternionf()
+        } else {
+            val delta = raw.scale(1.0 / kotlin.math.sqrt(lenSq))
+            if (delta.z <= -0.9999) {
+                Quaternionf().rotateY(Math.PI.toFloat())
+            } else {
+                Quaternionf().rotateTo(0F, 0F, 1F, delta.x.toFloat(), 0F, delta.z.toFloat())
+            }
+        }
         poseStack.pushPose()
-        poseStack.mulPose(Quaternionf().rotateTo(0F, 0F, 1F, delta.x.toFloat(), delta.y.toFloat(), delta.z.toFloat()))
+        poseStack.mulPose(rot)
         poseStack.translate(-0.5, 1.0, 0.0)
         poseStack.scale(1F, -1F, 1F)
         PatternRenderer.renderPattern(entity.getPattern(), poseStack, SETTINGS, COLOR, 0.0, 512)

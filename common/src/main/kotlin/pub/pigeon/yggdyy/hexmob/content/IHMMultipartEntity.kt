@@ -1,18 +1,19 @@
 package pub.pigeon.yggdyy.hexmob.content
 
 import net.minecraft.world.phys.AABB
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
 interface IHMMultipartEntity<T: HMEntityPart> {
     fun getAllParts(): List<T>
     fun getPartsBoundingBox(): AABB? = null
     fun shouldRecord(): Boolean
     companion object {
-        val instances: MutableSet<IHMMultipartEntity<*>> = mutableSetOf()
+        val instances: MutableSet<IHMMultipartEntity<*>> =
+            Collections.newSetFromMap(ConcurrentHashMap())
         fun updateInstances() {
-            // 快照遍历：LevelMixin 在 getEntities（实体 tick 期间）调用本方法，
-            // 若遍历同时有新多段实体（如另一只大环）注册/注销，removeIf 会并发修改异常。
-            val dead = instances.filterNot { it.shouldRecord() }
-            if (dead.isNotEmpty()) instances.removeAll(dead)
+            // 线程安全迭代清理：ConcurrentHashMap 视图的 removeIf 避免跨线程并发修改异常
+            instances.removeIf { !it.shouldRecord() }
         }
     }
 }

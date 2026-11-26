@@ -49,7 +49,7 @@ object HexMobEntities {
         EntityType.Builder.of(
             {type, level -> UrCircleEntity(type, level)},
             MobCategory.MISC
-        ).sized(10F, 6F).clientTrackingRange(32).build("ur_circle")
+        ).sized(10F, 6F).clientTrackingRange(44).build("ur_circle")
     }
     val IOTA_SHEEP: DeferredSupplier<EntityType<IotaSheepEntity>> = ENTITIES.register("iota_sheep") {
         EntityType.Builder.of(
@@ -67,13 +67,13 @@ object HexMobEntities {
         EntityType.Builder.of(
             { type, level -> SlateProjectile(type, level) },
             MobCategory.MISC
-        ).sized(0.5F, 0.5F).build("slate_projectile")
+        ).sized(0.5F, 0.5F).clientTrackingRange(16).build("slate_projectile")
     }
     val UR_CIRCLE_SERPENT: DeferredSupplier<EntityType<UrCircleSerpent>> = ENTITIES.register("ur_circle_serpent") {
         EntityType.Builder.of(
             { type, level -> UrCircleSerpent(type, level) },
             MobCategory.MISC
-        ).sized(0.9F, 0.9F).build("ur_circle_serpent")
+        ).sized(0.9F, 0.9F).clientTrackingRange(16).build("ur_circle_serpent")
     }
     val UR_CORE_BEAM: DeferredSupplier<EntityType<UrCoreBeamEntity>> = ENTITIES.register("ur_core_beam") {
         // 尺寸必须非零：原版 shouldRenderAtSqrDistance 用包围盒体积*64 算渲染距离，

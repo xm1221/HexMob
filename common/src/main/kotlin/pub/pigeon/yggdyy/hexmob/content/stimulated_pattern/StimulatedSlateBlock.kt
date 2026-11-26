@@ -58,7 +58,7 @@ class StimulatedSlateBlock(p: Properties?) : BlockSlate(p) {
                 dir
             )
         }
-        val data: CompoundTag = imageIn.userData
+        val data: CompoundTag = imageIn.userData.copy()
         val stimulatedPats: MutableList<HexPattern> = if(data.contains(KEY_STIMULATED_PATTERN)) {
             CODEC_STIMULATED_PATTERNS.decode(NbtOps.INSTANCE, data.get(KEY_STIMULATED_PATTERN)).get().map(
                 {it.first.toMutableList()},
@@ -84,21 +84,29 @@ class StimulatedSlateBlock(p: Properties?) : BlockSlate(p) {
             if(pData.contains(KEY_STIMULATED_PATTERN_COUNT, Tag.TAG_INT.toInt())) {
                 val p: Int = pData.getInt(KEY_STIMULATED_PATTERN_COUNT)
                 if(p > 0) {
-                    val factor: Double = (1.0 - HexMobServerConfig.config.opStimulatedSlateMediaDiscount).pow(p)
-                    pEnv.addExtension(MediaDiscountExtension(factor))
-                    pEnv.addExtension(PatternWhitelistExtension(factor, pEnv))
+                    val discount: Double = HexMobServerConfig.config.opStimulatedSlateMediaDiscount.coerceIn(0.0, 1.0)
+                    val factor: Double = (1.0 - discount).pow(p)
+                    val discountExt = MediaDiscountExtension(factor)
+                    pEnv.addExtension(discountExt)
+                    pEnv.addExtension(PatternWhitelistExtension(factor, pEnv, discountExt))
                 }
             }
         }
         class MediaDiscountExtension(val factor: Double): ExtractMedia.Pre {
+            var bypass: Boolean = false
             override fun getKey(): CastingEnvironmentComponent.Key<*> = KEY
-            override fun onExtractMedia(cost: Long, simulate: Boolean): Long = (cost * factor).toLong()
+            override fun onExtractMedia(cost: Long, simulate: Boolean): Long =
+                if (bypass) cost else (cost * factor).toLong()
             companion object {
                 class Key: CastingEnvironmentComponent.Key<MediaDiscountExtension>
                 val KEY: Key = Key()
             }
         }
-        class PatternWhitelistExtension(val factor: Double, val env: CastingEnvironment): PostExecution {
+        class PatternWhitelistExtension(
+            val factor: Double,
+            val env: CastingEnvironment,
+            val discountExt: MediaDiscountExtension,
+        ): PostExecution {
             override fun getKey(): CastingEnvironmentComponent.Key<*> = KEY
             override fun onPostExecution(result: CastResult) {
                 var cost = 0L
@@ -110,21 +118,38 @@ class StimulatedSlateBlock(p: Properties?) : BlockSlate(p) {
                     val pat: HexPattern = (result.cast as? PatternIota)?.pattern ?: return
                     val id: String = actionKey(PatternRegistryManifest.matchPattern(pat, env, false))?.toString() ?: return
                     if(HexMobServerConfig.config.stimulatedSlateBlacklist.contains(id)) {
-                        val all: Long = (cost.toDouble() / factor).roundToLong()
-                        val ext: Long = (cost.toDouble() / factor * (1.0 - factor)).roundToLong()
-                        val rest: Long = env.extractMedia(all, true)
-                        if(rest > 0) {
-                            env.printMessage(MishapNotEnoughMedia(rest).errorMessageWithName(env, Mishap.Context(pat, Component.translatable("hexcasting.action.$id"))))
-                            (env as? CircleCastEnv)?.apply {
-                                world?.destroyBlock(circleState().currentPos, true)
-                            }
-                            (env as? PlayerBasedCastEnv)?.apply {
-                                castingEntity?.hurt(world.damageSources().magic(), rest.toFloat() / MediaConstants.DUST_UNIT)
+                        if (factor <= 1.0E-9) {
+                            discountExt.bypass = true
+                            try {
+                                val rest: Long = env.extractMedia(cost, true)
+                                if (rest > 0) {
+                                    penalizeNotEnoughMedia(pat, id, rest)
+                                } else {
+                                    env.extractMedia(cost, false)
+                                }
+                            } finally {
+                                discountExt.bypass = false
                             }
                         } else {
-                            env.extractMedia(ext, false)
+                            val all: Long = (cost.toDouble() / factor).roundToLong()
+                            val ext: Long = (cost.toDouble() / factor * (1.0 - factor)).roundToLong()
+                            val rest: Long = env.extractMedia(all, true)
+                            if(rest > 0) {
+                                penalizeNotEnoughMedia(pat, id, rest)
+                            } else {
+                                env.extractMedia(ext, false)
+                            }
                         }
                     }
+                }
+            }
+            private fun penalizeNotEnoughMedia(pat: HexPattern, id: String, rest: Long) {
+                env.printMessage(MishapNotEnoughMedia(rest).errorMessageWithName(env, Mishap.Context(pat, Component.translatable("hexcasting.action.$id"))))
+                (env as? CircleCastEnv)?.apply {
+                    world?.destroyBlock(circleState().currentPos, true)
+                }
+                (env as? PlayerBasedCastEnv)?.apply {
+                    castingEntity?.hurt(world.damageSources().magic(), rest.toFloat() / MediaConstants.DUST_UNIT)
                 }
             }
             companion object {

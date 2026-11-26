@@ -13,12 +13,14 @@ import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.monster.Enemy
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCirclePart
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
 import pub.pigeon.yggdyy.hexmob.util.spawnParticle
 import java.util.UUID
@@ -87,7 +89,7 @@ class UrCircleSerpent(entityType: EntityType<out Entity>, level: Level) : Entity
         }
     }
 
-    /** 蛇头碰撞：对非敌对生物造成伤害（带每目标冷却）。 */
+    /** 蛇头碰撞：大环释放时跳过大环系友方，玩家/其他施法者释放时可命中大环、部件与守卫。 */
     private fun hurtContacts() {
         val it = contactCooldowns.entries.iterator()
         while (it.hasNext()) {
@@ -97,11 +99,20 @@ class UrCircleSerpent(entityType: EntityType<out Entity>, level: Level) : Entity
         }
         val head = position()
         val box = AABB(head, head).inflate(1.2)
-        for (victim in level().getEntitiesOfClass(LivingEntity::class.java, box)) {
-            if (victim === owner || isUrCircleAlly(victim)) continue
-            if (contactCooldowns.containsKey(victim.uuid)) continue
-            if (victim.hurt(level().damageSources().mobAttack(owner), CONTACT_DAMAGE)) {
-                contactCooldowns[victim.uuid] = CONTACT_COOLDOWN
+        val fromUrCircle = owner == null || owner is UrCircleEntity
+        val source = when (val o = owner) {
+            is Player -> level().damageSources().playerAttack(o)
+            is LivingEntity -> level().damageSources().mobAttack(o)
+            else -> level().damageSources().magic()
+        }
+        for (victim in level().getEntities(this, box) { it is LivingEntity || (it is UrCirclePart && it.active && !it.walkPlatform) }) {
+            if (victim === owner) continue
+            if (fromUrCircle && isUrCircleAlly(victim)) continue
+            if (!fromUrCircle && owner != null && victim.isAlliedTo(owner!!)) continue
+            val cooldownKey = if (victim is UrCirclePart) victim.parentMob.uuid else victim.uuid
+            if (contactCooldowns.containsKey(cooldownKey)) continue
+            if (victim.hurt(source, CONTACT_DAMAGE)) {
+                contactCooldowns[cooldownKey] = CONTACT_COOLDOWN
             }
         }
     }

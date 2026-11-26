@@ -38,9 +38,9 @@ interface IotaEntity : ADIotaHolder {
     override fun readIotaTag(): CompoundTag? = getIotaNbt()
 
     override fun writeIota(iota: Iota?, simulate: Boolean): Boolean {
-        if (iota == null) return writeable()
+        if (!writeable()) return false
         if (!simulate) {
-            setIotaNbt(IotaType.serialize(iota))
+            writeIota(iota ?: NullIota())
         }
         return true
     }

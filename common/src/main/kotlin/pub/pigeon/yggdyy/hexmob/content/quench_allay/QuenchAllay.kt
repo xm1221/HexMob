@@ -36,6 +36,8 @@ class QuenchAllay(entityType: EntityType<out QuenchAllay>, level: Level) : Allay
         private val TARGET = defineIotaAccessor(QuenchAllay::class.java)
         private val IOTA_KEY: String = HexMob.id("iota").toString()
         private val TARGET_KEY: String = HexMob.id("target").toString()
+        private val EMPTY_TARGET_TAG: CompoundTag by lazy { emptyIotaTag() }
+        private const val TARGET_ARRIVAL_DIST_SQR = 2.25
     }
 
     /**
@@ -129,13 +131,21 @@ class QuenchAllay(entityType: EntityType<out QuenchAllay>, level: Level) : Allay
     }
 
     /** 默认为空 target（emptyIotaTag）；只有确实设置了向量目标时才与之不同。 */
-    private fun hasTarget(): Boolean = this.getAllayTargetTag() != emptyIotaTag()
+    private fun hasTarget(): Boolean {
+        val tag = this.getAllayTargetTag()
+        return !tag.isEmpty && tag != EMPTY_TARGET_TAG
+    }
 
     override fun tick() {
         super.tick()
-        if (this.tickCount % 7 == 0 && hasTarget()) {
+        if (!level().isClientSide && hasTarget()) {
             val vec = this.getAllayTarget()
-            this.navigation.moveTo(vec.x, vec.y, vec.z, 1.0)
+            if (this.position().distanceToSqr(vec) <= TARGET_ARRIVAL_DIST_SQR) {
+                clearAllayTarget()
+                this.navigation.stop()
+            } else if (this.tickCount % 7 == 0) {
+                this.navigation.moveTo(vec.x, vec.y, vec.z, 1.0)
+            }
         }
     }
 }

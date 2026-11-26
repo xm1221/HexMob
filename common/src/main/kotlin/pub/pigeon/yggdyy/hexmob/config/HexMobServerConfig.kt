@@ -54,6 +54,8 @@ object HexMobServerConfig {
         }
     }
 
+    private var serverSyncRegistered = false
+
     fun init() {
         holder = AutoConfig.register(
             GlobalConfig::class.java,
@@ -64,6 +66,8 @@ object HexMobServerConfig {
         holder.registerSaveListener { _, _ -> InteractionResult.FAIL }
     }
     fun initServer() {
+        if (serverSyncRegistered) return
+        serverSyncRegistered = true
         PlayerEvent.PLAYER_JOIN.register { player ->
             MsgSyncConfigS2C(holder.config.server).sendToPlayer(player)
         }
@@ -98,14 +102,26 @@ object HexMobServerConfig {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(opTransformStimulatedPatternCost)
             buf.writeDouble(opStimulatedSlateMediaDiscount)
+            buf.writeVarInt(stimulatedSlateBlacklist.size)
+            for (entry in stimulatedSlateBlacklist) {
+                buf.writeUtf(entry)
+            }
             buf.writeDouble(stimulatedPatternSpawnRate)
+            buf.writeDouble(cryingAmethystSpawnRate)
             buf.writeFloat(urCircleScale)
             buf.writeBoolean(urCircleTerrainDamage)
         }
         fun decode(buf: FriendlyByteBuf): ServerConfig {
             opTransformStimulatedPatternCost = buf.readLong()
             opStimulatedSlateMediaDiscount = buf.readDouble()
+            val blacklistSize = buf.readVarInt().coerceIn(0, 4096)
+            val blacklist = ArrayList<String>(blacklistSize)
+            for (i in 0 until blacklistSize) {
+                blacklist.add(buf.readUtf())
+            }
+            stimulatedSlateBlacklist = blacklist
             stimulatedPatternSpawnRate = buf.readDouble()
+            cryingAmethystSpawnRate = buf.readDouble()
             urCircleScale = buf.readFloat()
             urCircleTerrainDamage = buf.readBoolean()
             return this

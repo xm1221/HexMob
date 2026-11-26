@@ -14,6 +14,7 @@
   "license": "MIT",
   "icon": "assets/hexmob/icon.png",
   "environment": "*",
+  "accessWidener": "hexmob.accesswidener",
   "entrypoints": {
     "main": [{
       "adapter": "kotlin",

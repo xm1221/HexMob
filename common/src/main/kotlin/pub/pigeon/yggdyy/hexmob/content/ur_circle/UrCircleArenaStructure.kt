@@ -33,10 +33,20 @@ class UrCircleArenaStructure(
         // 避免骑在群系边缘：祭坛占地 11×11 取 3×3 采样点，
         // 任一采样点不在 crystal_spikes 内就不在这里生成（不悬空挂边界）。
         val biomeKey = ResourceKey.create(Registries.BIOME, ResourceLocation("hexmob", "crystal_spikes"))
-        val sampler = context.randomState().sampler()
+        val generator = context.chunkGenerator()
+        val heightAccessor = context.heightAccessor()
+        val randomState = context.randomState()
+        val sampler = randomState.sampler()
+        val minY = heightAccessor.minBuildHeight
+        val maxY = (heightAccessor.maxBuildHeight - 1).coerceAtLeast(minY)
         val fullyInside = listOf(-5, 0, 5).all { dx ->
             listOf(-5, 0, 5).all { dz ->
-                context.biomeSource().getNoiseBiome((cx + dx) shr 2, 0, (cz + dz) shr 2, sampler).`is`(biomeKey)
+                val sx = cx + dx
+                val sz = cz + dz
+                val surfaceY = generator.getFirstOccupiedHeight(
+                    sx, sz, Heightmap.Types.WORLD_SURFACE_WG, heightAccessor, randomState
+                ).coerceIn(minY, maxY)
+                context.biomeSource().getNoiseBiome(sx shr 2, surfaceY shr 2, sz shr 2, sampler).`is`(biomeKey)
             }
         }
         if (!fullyInside) return Optional.empty()

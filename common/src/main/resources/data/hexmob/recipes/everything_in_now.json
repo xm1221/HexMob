@@ -15,7 +15,6 @@
   },
   "result": {
     "item": "hexmob:everything_in_now",
-    "count": 1,
-    "nbt": "{\"hexcasting:media\":76800000,\"hexcasting:start_media\":76800000}"
+    "count": 1
   }
 }

@@ -6,8 +6,8 @@ import at.petrak.hexcasting.api.casting.getVec3
 import at.petrak.hexcasting.api.casting.iota.Iota
 import at.petrak.hexcasting.api.casting.math.HexDir
 import at.petrak.hexcasting.api.casting.math.HexPattern
-import at.petrak.hexcasting.api.casting.mishaps.MishapBadLocation
 import at.petrak.hexcasting.api.misc.MediaConstants
+import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.api.casting.actions.UrCircleSpell
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.SlateProjectile
@@ -28,7 +28,7 @@ class SlateProjectileSpell : UrCircleSpell() {
     override fun makeEffect(args: List<Iota>, env: CastingEnvironment): RenderedSpell {
         val pos = args.getVec3(0, argc)
         val aim = args.getVec3(1, argc)
-        if (!env.isVecInRange(pos)) throw MishapBadLocation(pos)
+        env.assertPosInRangeForEditing(BlockPos.containing(pos))
         return Spell(pos, aim)
     }
 
@@ -37,11 +37,13 @@ class SlateProjectileSpell : UrCircleSpell() {
             val caster = env.castingEntity ?: return
             val level = env.world
             if (level.isClientSide) return
+            if (!env.canEditBlockAt(BlockPos.containing(from))) return
             for (i in 0 until SHOTS) {
                 val projectile = SlateProjectile(HexMobEntities.SLATE_PROJECTILE.get(), level)
                 projectile.setPos(from.x, from.y, from.z)
                 projectile.owner = caster
                 projectile.pattern = PROJECTILE_PATTERN
+                projectile.convertChance = 0.0F
                 projectile.shoot(aim.x, aim.y, aim.z, SPEED, INACCURACY)
                 level.addFreshEntity(projectile)
             }

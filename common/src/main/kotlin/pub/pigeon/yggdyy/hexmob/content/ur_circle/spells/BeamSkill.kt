@@ -56,7 +56,7 @@ class BeamSkill : UrCircleSkill("core_beam", CHANNEL_TICKS) {
             sweepPoint = desiredTarget
         }
 
-        if (aimSlate != null && !aimSlate.detached && !aimSlate.tamperable && !aimSlate.rebounded) {
+        if (aimSlate != null && !aimSlate.detached && !aimSlate.rebounded) {
             val prevAnchor = aimSlate.deployedPos ?: desiredTarget
             val diff = desiredTarget.subtract(prevAnchor)
             val d = diff.length()
@@ -94,7 +94,7 @@ class BeamSkill : UrCircleSkill("core_beam", CHANNEL_TICKS) {
         val t = circle.target
         val aimSlate = circle.findSymbolicSlate(SlateSymbolType.AIM)
 
-        if (aimSlate != null && (aimSlate.detached || aimSlate.tamperable) && !aimSlate.rebounded && aimSlate.posNow != Vec3.ZERO) {
+        if (aimSlate != null && aimSlate.detached && !aimSlate.rebounded && aimSlate.posNow != Vec3.ZERO) {
             sweepPoint = aimSlate.posNow
         } else {
             val desired = if (t != null && t.isAlive) {
@@ -147,6 +147,10 @@ class BeamSkill : UrCircleSkill("core_beam", CHANNEL_TICKS) {
     }
 
     override fun onBeamEnd(circle: UrCircleEntity) {
+        sweepPoint = Vec3.ZERO
+    }
+
+    override fun onChannelCancel(circle: UrCircleEntity) {
         sweepPoint = Vec3.ZERO
     }
 

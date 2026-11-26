@@ -13,7 +13,13 @@ import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
  * 法术环（[CircleCastEnv]）与淬晶悦灵等生物施法（[MobCastingEnv]）等间接施法不受此反噬。
  */
 object HexMobBacklash {
-    var suppress = false
+    private val suppressLocal: ThreadLocal<Boolean> = ThreadLocal.withInitial { false }
+
+    var suppress: Boolean
+        get() = suppressLocal.get()
+        set(value) {
+            if (value) suppressLocal.set(true) else suppressLocal.remove()
+        }
 
     fun onCast(env: CastingEnvironment) {
         if (suppress) return
@@ -22,10 +28,12 @@ object HexMobBacklash {
         if (!player.isAlive) return
         val level = player.level()
         if (level.isClientSide) return
+        val maxDistSq = UrCircleEntity.BACKLASH_RANGE * UrCircleEntity.BACKLASH_RANGE
         val circle = level.getEntitiesOfClass(
             UrCircleEntity::class.java,
             AABB(player.blockPosition()).inflate(UrCircleEntity.BACKLASH_RANGE)
-        ) { it.isAlive && it.isSiphoning() }.minByOrNull { it.distanceToSqr(player) } ?: return
+        ) { it.isAlive && it.isSiphoning() && it.distanceToSqr(player) <= maxDistSq }
+            .minByOrNull { it.distanceToSqr(player) } ?: return
         circle.accumulateBacklash(player)
     }
 }

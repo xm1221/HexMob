@@ -41,11 +41,11 @@ public abstract class MultiNoiseBiomeSourceMixin {
         Biomes.DARK_FOREST, Biomes.SWAMP, Biomes.FOREST, Biomes.BIRCH_FOREST, Biomes.FLOWER_FOREST
     );
     /** 诊断用一次性标记。 */
-    private static boolean diagRun;
-    private static boolean diagNotHost;
-    private static boolean diagNoCrystal;
-    private static boolean diagSet;
-    private static boolean diagHead;
+    private static volatile boolean diagRun;
+    private static volatile boolean diagNotHost;
+    private static volatile boolean diagNoCrystal;
+    private static volatile boolean diagSet;
+    private static volatile boolean diagHead;
 
     static {
         // 用与 FabricHexMob 相同的 Log4j logger（pub.pigeon.yggdyy.hexmob.HexMob.LOGGER），

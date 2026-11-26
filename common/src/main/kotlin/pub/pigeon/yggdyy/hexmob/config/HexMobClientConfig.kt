@@ -36,7 +36,7 @@ object HexMobClientConfig {
     }
     @Config(name = HexMob.MODID)
     class GlobalConfig : GlobalData() {
-        @Category("server")
+        @Category("client")
         @TransitiveObject
         val client = ClientConfig()
         // this should only be used inside of this class; use HexMobServerConfig.config to access the server-side config in other code

@@ -1,6 +1,7 @@
 package pub.pigeon.yggdyy.hexmob.mixin;
 
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
@@ -22,35 +23,51 @@ public abstract class LevelMixin {
         Level self = (Level) ((Object) this);
         List<Entity> res = cir.getReturnValue();
         IHMMultipartEntity.Companion.updateInstances();
-        IHMMultipartEntity.Companion.getInstances().stream().filter(_e -> _e instanceof Entity e && _e != entity && self == e.level()).forEach(_e -> {
-            AABB partsBox = _e.getPartsBoundingBox();
-            if (partsBox != null && !partsBox.intersects(area)) {
-                return;
+        for (IHMMultipartEntity<?> multipart : IHMMultipartEntity.Companion.getInstances()) {
+            if (!(multipart instanceof Entity parent) || parent == entity || parent.level() != self) {
+                continue;
             }
-            _e.getAllParts().stream().filter(predicate.and(e -> e instanceof HMEntityPart e1 && e1.shouldInteract() && e1.getBoundingBox().intersects(area))).forEach(res::add);
-        });
+            AABB partsBox = multipart.getPartsBoundingBox();
+            if (partsBox != null && !partsBox.intersects(area)) {
+                continue;
+            }
+            for (HMEntityPart part : multipart.getAllParts()) {
+                if (part != null && part.shouldInteract() && part.getBoundingBox().intersects(area) && predicate.test(part)) {
+                    res.add(part);
+                }
+            }
+        }
         cir.setReturnValue(res);
     }
     @Inject(method = "getEntities(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;Ljava/util/List;I)V", at = @At("RETURN"))
     private void addHexMobMultipartEntities2(EntityTypeTest<Entity, Entity> entityTypeTest, AABB bounds, Predicate<Entity> predicate, List<Entity> output, int maxResults, CallbackInfo ci) {
+        // HMEntityPart 构造传入 parentMob.type，按 EntityType 筛选时必须跳过，防止误强转为父实体类型抛出 ClassCastException
+        if (entityTypeTest instanceof EntityType<?> || output.size() >= maxResults) {
+            return;
+        }
         Level self = (Level) ((Object) this);
         IHMMultipartEntity.Companion.updateInstances();
-        IHMMultipartEntity.Companion.getInstances().stream().filter(_e -> _e instanceof Entity e && self == e.level()).forEach(_e -> {
-            AABB partsBox = _e.getPartsBoundingBox();
-            if (partsBox != null && !partsBox.intersects(bounds)) {
-                return;
+        Class<?> baseClass = entityTypeTest.getBaseClass();
+        for (IHMMultipartEntity<?> multipart : IHMMultipartEntity.Companion.getInstances()) {
+            if (!(multipart instanceof Entity parent) || parent.level() != self) {
+                continue;
             }
-            _e.getAllParts().forEach(e -> {
-                if(!e.shouldInteract()) {
-                    return;
+            AABB partsBox = multipart.getPartsBoundingBox();
+            if (partsBox != null && !partsBox.intersects(bounds)) {
+                continue;
+            }
+            for (HMEntityPart part : multipart.getAllParts()) {
+                if (part == null || !part.shouldInteract()) {
+                    continue;
                 }
-                Entity e1 = entityTypeTest.tryCast(e);
-                if(e1 != null && e1.getBoundingBox().intersects(bounds) && predicate.test(e1)) {
-                    if(output.size() < maxResults) {
-                        output.add(e1);
+                Entity e1 = entityTypeTest.tryCast(part);
+                if (e1 != null && baseClass.isInstance(e1) && e1.getBoundingBox().intersects(bounds) && predicate.test(e1)) {
+                    output.add(e1);
+                    if (output.size() >= maxResults) {
+                        return;
                     }
                 }
-            });
-        });
+            }
+        }
     }
 }

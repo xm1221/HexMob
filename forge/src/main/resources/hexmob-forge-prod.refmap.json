@@ -1,7 +1,8 @@
 {
   "mappings": {
     "pub/pigeon/yggdyy/hexmob/mixin/BossHealthOverlayMixin": {
-      "drawBar(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280106_(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V"
+      "drawBar(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280106_(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V",
+      "render(Lnet/minecraft/client/gui/GuiGraphics;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280652_(Lnet/minecraft/client/gui/GuiGraphics;)V"
     },
     "pub/pigeon/yggdyy/hexmob/mixin/ClientLevelMixin": {
       "getCloudColor": "Lnet/minecraft/client/multiplayer/ClientLevel;m_104808_(F)Lnet/minecraft/world/phys/Vec3;",
@@ -11,6 +12,9 @@
       "renderHitbox": "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;m_114441_(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V"
     },
     "pub/pigeon/yggdyy/hexmob/mixin/FogRendererMixin": {
+      "fogBlue": "Lnet/minecraft/client/renderer/FogRenderer;f_109012_:F",
+      "fogGreen": "Lnet/minecraft/client/renderer/FogRenderer;f_109011_:F",
+      "fogRed": "Lnet/minecraft/client/renderer/FogRenderer;f_109010_:F",
       "setupColor": "Lnet/minecraft/client/renderer/FogRenderer;m_109018_(Lnet/minecraft/client/Camera;FLnet/minecraft/client/multiplayer/ClientLevel;IF)V"
     },
     "pub/pigeon/yggdyy/hexmob/mixin/GeodeFeatureMixin": {
@@ -42,6 +46,7 @@
       "isTall": "f_229587_:Z"
     },
     "pub/pigeon/yggdyy/hexmob/mixin/StrongholdPiecesMixin": {
+      "currentPieces": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;f_229410_:Ljava/util/List;",
       "findAndCreatePieceFactory": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229426_(Ljava/lang/Class;Lnet/minecraft/world/level/levelgen/structure/StructurePieceAccessor;Lnet/minecraft/util/RandomSource;IIILnet/minecraft/core/Direction;I)Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces$StrongholdPiece;",
       "resetPieces": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229416_()V"
     }
@@ -49,7 +54,8 @@
   "data": {
     "searge": {
       "pub/pigeon/yggdyy/hexmob/mixin/BossHealthOverlayMixin": {
-        "drawBar(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280106_(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V"
+        "drawBar(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280106_(Lnet/minecraft/client/gui/GuiGraphics;IILnet/minecraft/world/BossEvent;)V",
+        "render(Lnet/minecraft/client/gui/GuiGraphics;)V": "Lnet/minecraft/client/gui/components/BossHealthOverlay;m_280652_(Lnet/minecraft/client/gui/GuiGraphics;)V"
       },
       "pub/pigeon/yggdyy/hexmob/mixin/ClientLevelMixin": {
         "getCloudColor": "Lnet/minecraft/client/multiplayer/ClientLevel;m_104808_(F)Lnet/minecraft/world/phys/Vec3;",
@@ -59,6 +65,9 @@
         "renderHitbox": "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;m_114441_(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V"
       },
       "pub/pigeon/yggdyy/hexmob/mixin/FogRendererMixin": {
+        "fogBlue": "Lnet/minecraft/client/renderer/FogRenderer;f_109012_:F",
+        "fogGreen": "Lnet/minecraft/client/renderer/FogRenderer;f_109011_:F",
+        "fogRed": "Lnet/minecraft/client/renderer/FogRenderer;f_109010_:F",
         "setupColor": "Lnet/minecraft/client/renderer/FogRenderer;m_109018_(Lnet/minecraft/client/Camera;FLnet/minecraft/client/multiplayer/ClientLevel;IF)V"
       },
       "pub/pigeon/yggdyy/hexmob/mixin/GeodeFeatureMixin": {
@@ -90,6 +99,7 @@
         "isTall": "f_229587_:Z"
       },
       "pub/pigeon/yggdyy/hexmob/mixin/StrongholdPiecesMixin": {
+        "currentPieces": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;f_229410_:Ljava/util/List;",
         "findAndCreatePieceFactory": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229426_(Ljava/lang/Class;Lnet/minecraft/world/level/levelgen/structure/StructurePieceAccessor;Lnet/minecraft/util/RandomSource;IIILnet/minecraft/core/Direction;I)Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces$StrongholdPiece;",
         "resetPieces": "Lnet/minecraft/world/level/levelgen/structure/structures/StrongholdPieces;m_229416_()V"
       }

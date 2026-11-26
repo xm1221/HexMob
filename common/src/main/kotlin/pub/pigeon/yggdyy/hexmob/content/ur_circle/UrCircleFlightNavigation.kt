@@ -27,11 +27,15 @@ class UrCircleFlightNavigation(private val circle: UrCircleEntity) {
         }
         hullCacheTick = now
         hullCachePos = origin
-        val rOuter = circle.ringOuterRadius() + CLEAR_MARGIN
+        val rOuter = avoidanceRadius()
         val clear = isHullClearAt(circle.level(), origin, rOuter)
         hullClearCache = clear
         return clear
     }
+
+    private fun avoidanceRadius(): Double =
+        // 仅为核心与内环留出实体碰撞裕度，避免二/三阶段 86~185 格天穹外环扫到远方山体/树木而死锁停飞
+        minOf(circle.ringOuterRadius(), MAX_AVOID_RADIUS) + CLEAR_MARGIN
 
     fun safeFlightDir(desired: Vec3, lookAhead: Double): Vec3? {
         if (desired.lengthSqr() < 1.0E-6) return null
@@ -44,7 +48,7 @@ class UrCircleFlightNavigation(private val circle: UrCircleEntity) {
         cachedDesired = desiredNorm
 
         val origin = circle.position().add(0.0, circle.bbHeight / 2.0, 0.0)
-        val rOuter = circle.ringOuterRadius() + CLEAR_MARGIN
+        val rOuter = avoidanceRadius()
         val level = circle.level()
         val currentlyClear = isHullClear()
 
@@ -67,12 +71,15 @@ class UrCircleFlightNavigation(private val circle: UrCircleEntity) {
                 break
             }
         }
+        if (chosen == null && !currentlyClear && origin.y < level.maxBuildHeight - 16) {
+            chosen = Vec3(0.0, 1.0, 0.0)
+        }
         cachedSafeDir = chosen
         return chosen
     }
 
     private fun isHullClearAt(level: Level, pos: Vec3, rOuter: Double): Boolean {
-        val dySpan = rOuter * 0.35
+        val dySpan = (rOuter * 0.25).coerceAtMost(MAX_AVOID_DY)
         val ys = doubleArrayOf(-dySpan, 0.0, dySpan)
         for (k in 0 until AZIMUTH_SAMPLES) {
             val a = Math.PI * 2.0 * k / AZIMUTH_SAMPLES
@@ -92,5 +99,7 @@ class UrCircleFlightNavigation(private val circle: UrCircleEntity) {
         private const val CACHE_TICKS = 4
         private const val AZIMUTH_SAMPLES = 8
         private const val CLEAR_MARGIN = 1.2
+        private const val MAX_AVOID_RADIUS = 32.0
+        private const val MAX_AVOID_DY = 8.0
     }
 }

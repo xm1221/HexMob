@@ -9,11 +9,12 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.util.Mth
 import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
-import org.joml.Vector3f
 import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.renderers.CubeRenderer
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.renderers.SlateRenderer
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.renderers.UrCircleVfxRenderer
+import pub.pigeon.yggdyy.hexmob.util.safeLerpDir
+import pub.pigeon.yggdyy.hexmob.util.safeRotateZTo
 
 class UrCircleRenderer(val context: EntityRendererProvider.Context) : EntityRenderer<UrCircleEntity>(context) {
     override fun getTextureLocation(entity: UrCircleEntity): ResourceLocation = HexMob.id("null")
@@ -37,6 +38,7 @@ class UrCircleRenderer(val context: EntityRendererProvider.Context) : EntityRend
         val midLod = camDist > LOD_MID_DISTANCE
 
         val parts: List<UrCirclePart> = entity.getAllParts()
+        val rotQuat = Quaternionf()
         for (part in parts) {
             if (!part.shouldRenderAsPart()) continue
             val isWaveHead = entity.isActiveWaveNode(part)
@@ -46,7 +48,7 @@ class UrCircleRenderer(val context: EntityRendererProvider.Context) : EntityRend
 
             val p: Vec3 = part.posPrev.lerp(part.posNow, partialTick.toDouble())
             val deltaP: Vec3 = p.subtract(ix, iy, iz)
-            val d: Vec3 = part.dirPrev.lerp(part.dirNow, partialTick.toDouble())
+            val d: Vec3 = safeLerpDir(part.dirPrev, part.dirNow, partialTick.toDouble())
             val renderDetails = when {
                 farLod -> false
                 midLod -> isWaveHead || part.ringIndex == 1
@@ -55,7 +57,7 @@ class UrCircleRenderer(val context: EntityRendererProvider.Context) : EntityRend
 
             poseStack.pushPose()
             poseStack.translate(deltaP.x, deltaP.y, deltaP.z)
-            poseStack.mulPose(Quaternionf().rotateTo(Vector3f(0F, 0F, 1F), d.toVector3f()))
+            poseStack.mulPose(safeRotateZTo(d, rotQuat))
             for (renderer in renderers) {
                 if (renderer.id == part.id) {
                     renderer.render(part, poseStack, buffer, packedLight, partialTick, context, renderDetails)

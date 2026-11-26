@@ -1,6 +1,7 @@
 package pub.pigeon.yggdyy.hexmob.content.guard
 
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
@@ -45,12 +46,23 @@ class GuardCore {
     }
 
     /** 最近一个清醒的大环（索敌/仇恨目标来源）。 */
-    fun findMaster(entity: Entity): UrCircleEntity? =
-        entity.level().getEntitiesOfClass(UrCircleEntity::class.java, entity.boundingBox.inflate(GUARD_AWAKE_RANGE))
+    fun findMaster(entity: Entity): UrCircleEntity? {
+        val id = summonerUuid
+        if (id != null) {
+            val server = entity.level() as? ServerLevel
+            val summonedBy = server?.getEntity(id) as? UrCircleEntity
+            if (summonedBy != null && summonedBy.isAlive && summonedBy.isAwake() &&
+                summonedBy.distanceToSqr(entity) <= GUARD_AWAKE_RANGE * GUARD_AWAKE_RANGE
+            ) {
+                return summonedBy
+            }
+        }
+        return entity.level().getEntitiesOfClass(UrCircleEntity::class.java, entity.boundingBox.inflate(GUARD_AWAKE_RANGE))
             .firstOrNull { it.isAwake() }
+    }
 
     companion object {
-        const val GUARD_AWAKE_RANGE = 64.0
+        const val GUARD_AWAKE_RANGE = 112.0
         const val TAG_SUMMONER = "hexmob:Summoner"
     }
 }

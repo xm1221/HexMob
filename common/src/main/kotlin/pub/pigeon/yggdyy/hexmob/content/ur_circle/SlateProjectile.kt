@@ -2,13 +2,17 @@ package pub.pigeon.yggdyy.hexmob.content.ur_circle
 
 import at.petrak.hexcasting.api.casting.math.HexDir
 import at.petrak.hexcasting.api.casting.math.HexPattern
+import at.petrak.hexcasting.xplat.IXplatAbstractions
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.projectile.AbstractHurtingProjectile
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.BlockHitResult
@@ -20,6 +24,9 @@ import pub.pigeon.yggdyy.hexmob.HexMob
  * 无重力、匀速直线飞行；命中实体造成伤害（含击退），命中方块即消散。
  */
 class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : AbstractHurtingProjectile(type, level) {
+    private var lifeTicks = 0
+    var convertChance: Float = CONVERT_CHANCE
+
     init {
         isNoGravity = true
         noCulling = true
@@ -41,10 +48,19 @@ class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : Abstrac
 
     override fun tick() {
         super.tick()
-        if (!level().isClientSide && tickCount % 2 == 0) {
-            UrCircleHexVfx.spawnConjure(level(), UrCircleHexVfx.MEDIA_PURPLE, x, y, z, 0.0, 0.02, 0.0)
+        if (!level().isClientSide) {
+            lifeTicks++
+            if (lifeTicks >= MAX_LIFETIME) {
+                discard()
+                return
+            }
+            if (tickCount % 2 == 0) {
+                UrCircleHexVfx.spawnConjure(level(), UrCircleHexVfx.MEDIA_PURPLE, x, y, z, 0.0, 0.02, 0.0)
+            }
         }
     }
+
+    override fun shouldBeSaved(): Boolean = false
 
     override fun addAdditionalSaveData(compound: CompoundTag) {
         super.addAdditionalSaveData(compound)
@@ -76,7 +92,11 @@ class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : Abstrac
         if (level().isClientSide) return
         val victim = result.entity
         if (owner is UrCircleEntity && isUrCircleAlly(victim)) return
-        val source = if (owner is LivingEntity) level().damageSources().mobAttack(owner as LivingEntity) else level().damageSources().magic()
+        val source = when (val o = owner) {
+            is Player -> level().damageSources().playerAttack(o)
+            is LivingEntity -> level().damageSources().mobAttack(o)
+            else -> level().damageSources().magic()
+        }
         if (victim.hurt(source, DAMAGE)) {
             (victim as? LivingEntity)?.knockback(0.5, deltaMovement.x, deltaMovement.z)
         }
@@ -86,15 +106,40 @@ class SlateProjectile(type: EntityType<SlateProjectile>, level: Level) : Abstrac
     override fun onHitBlock(result: BlockHitResult) {
         super.onHitBlock(result)
         if (!level().isClientSide) {
+            val effectiveConvert = if (owner is UrCircleEntity) convertChance else 0.0F
+            val sp = owner as? ServerPlayer
+            val canBreak: ((net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState) -> Boolean)? =
+                if (sp != null) {
+                    val sl = level() as? ServerLevel
+                    if (!sp.mayBuild() || sl == null) {
+                        { _, _ -> false }
+                    } else {
+                        { p, state ->
+                            !sl.server.isUnderSpawnProtection(sl, p, sp) &&
+                                IXplatAbstractions.INSTANCE.isBreakingAllowed(sl, p, state, sp)
+                        }
+                    }
+                } else {
+                    null
+                }
             // 命中处炸出 3×3×3 的坑 + 爆炸音效（不可破坏方块除外）：
-            // 不破坏 HexMod 紫水晶/板岩类方块、破坏不掉落、命中把一部分方块转化为紫水晶/板岩
-            craterAround(level(), result.blockPos, this, drop = false, skipHexStones = true, convertChance = CONVERT_CHANCE)
+            // Boss 发射时把一部分方块转化为紫水晶/板岩；玩家法术关闭转化且受编辑权限约束
+            craterAround(
+                level(),
+                result.blockPos,
+                this,
+                drop = false,
+                skipHexStones = true,
+                convertChance = effectiveConvert,
+                canBreak = canBreak,
+            )
             discard()
         }
     }
 
     companion object {
         const val DAMAGE = 8.0F
+        const val MAX_LIFETIME = 200
         /** 命中方块时把一部分方块转化为紫水晶/板岩的概率（0~1）。 */
         const val CONVERT_CHANCE = 0.4F
         val PATTERN: EntityDataAccessor<CompoundTag> = SynchedEntityData.defineId(SlateProjectile::class.java, EntityDataSerializers.COMPOUND_TAG)

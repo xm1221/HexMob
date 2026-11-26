@@ -41,12 +41,42 @@ public class HexMobMixinConfigPlugin implements IMixinConfigPlugin {
      *       用它会把 owner 改写成 Yarn 类名（{@code class_310}）而失败。</li>
      * </ul>
      *
-     * <p>Architectury common 依赖 fabric-loader，所以 {@code Knot.class} 可见 ≠ 在 Fabric 上；
-     * 这里只看 {@code sun.java.command}（启动命令行）：dev 的 launchTarget 是
-     * {@code forgeclientuserdev} / {@code forgeserveruserdev}，生产是 {@code forgeclient} / {@code forgeserver}。
+     * <p>优先通过运行期加载器 API 反射识别（{@code FMLLoader.getNaming()} 与 {@code FabricLoader.getInstance()}），
+     * 避免 Forge 生产端使用 {@code @argfile} 或自定义启动器导致 {@code sun.java.command} 失效；
+     * 若加载器类尚未就绪则保留 {@code sun.java.command} 作为后备。
      */
     @Override
     public String getRefMapperConfig() {
+        ClassLoader loader = HexMobMixinConfigPlugin.class.getClassLoader();
+        try {
+            Class<?> fmlLoader = Class.forName("net.minecraftforge.fml.loading.FMLLoader", false, loader);
+            Object namingObj = fmlLoader.getMethod("getNaming").invoke(null);
+            if (namingObj instanceof String naming) {
+                if ("srg".equals(naming)) {
+                    return "hexmob-forge-prod.refmap.json";
+                }
+                if ("mcp".equals(naming)) {
+                    return "hexmob-forge.refmap.json";
+                }
+            }
+            Object prodObj = fmlLoader.getMethod("isProduction").invoke(null);
+            if (prodObj instanceof Boolean isProd) {
+                return isProd ? "hexmob-forge-prod.refmap.json" : "hexmob-forge.refmap.json";
+            }
+        } catch (Throwable ignored) {
+            // Non-Forge environment
+        }
+
+        try {
+            Class<?> fabricLoader = Class.forName("net.fabricmc.loader.api.FabricLoader", false, loader);
+            Object instance = fabricLoader.getMethod("getInstance").invoke(null);
+            if (instance != null) {
+                return "hexmob-common.refmap.json";
+            }
+        } catch (Throwable ignored) {
+            // Non-Fabric or FabricLoader not yet initialized
+        }
+
         String cmd = System.getProperty("sun.java.command", "");
         if (cmd.contains("Knot") || cmd.contains("fabric.loader")) {
             return "hexmob-common.refmap.json";

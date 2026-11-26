@@ -5,6 +5,9 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.material.FogType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -30,6 +33,11 @@ public class FogRendererMixin {
         float bossColorModifier,
         CallbackInfo ci
     ) {
+        if (activeRenderInfo.getFluidInCamera() != FogType.NONE) return;
+        if (activeRenderInfo.getEntity() instanceof LivingEntity living
+            && (living.hasEffect(MobEffects.BLINDNESS) || living.hasEffect(MobEffects.DARKNESS))) {
+            return;
+        }
         float intensity = UrCircleSkyTracker.getIntensity();
         if (intensity <= 0.005F) return;
         float p3 = UrCircleSkyTracker.getPhase3Intensity();

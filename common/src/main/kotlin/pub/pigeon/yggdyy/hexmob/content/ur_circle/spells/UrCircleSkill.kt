@@ -91,6 +91,9 @@ abstract class UrCircleSkill(val name: String, val channelTicks: Int) {
 
     open fun onChannelTick(circle: UrCircleEntity) {}
 
+    /** 技能吟唱或持续阶段被强制打断/转阶段/死亡取消时的统一状态清理钩子。 */
+    open fun onChannelCancel(circle: UrCircleEntity) {}
+
     // ---- 光束 / 持续环面状态（cast 后进入 BEAM） ----
 
     open fun beamTicks(circle: UrCircleEntity): Int = 0

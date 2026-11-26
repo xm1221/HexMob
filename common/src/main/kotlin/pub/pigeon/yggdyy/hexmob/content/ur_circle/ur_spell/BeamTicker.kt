@@ -4,7 +4,7 @@ import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.monster.Enemy
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
@@ -41,6 +41,7 @@ object BeamTicker {
         target: LivingEntity,
         durationTicks: Int,
     ) {
+        if (target.level() !== level || attacker.level() !== level) return
         val beam = Beam(level, origin, attacker, target, durationTicks.coerceAtLeast(1))
         val entity = UrCoreBeamEntity(HexMobEntities.UR_CORE_BEAM.get(), level)
         entity.setPos(origin.x, origin.y, origin.z)
@@ -59,7 +60,7 @@ object BeamTicker {
                 it.remove()
                 continue
             }
-            if (!b.attacker.isAlive || b.attacker.level() !== b.level || !b.target.isAlive) {
+            if (!b.attacker.isAlive || b.attacker.level() !== b.level || !b.target.isAlive || b.target.level() !== b.level) {
                 b.discardBeam()
                 it.remove()
                 continue
@@ -98,13 +99,14 @@ object BeamTicker {
             }
         }
 
-        // 周期伤害（直击必中 + AoE）
+        // 周期伤害（直击必中 + AoE：排除施法者及其盟友，可命中敌怪）
         if (b.ticksLeft % DAMAGE_INTERVAL == 0) {
-            val source = level.damageSources().mobAttack(b.attacker)
+            val source = (b.attacker as? Player)?.let { level.damageSources().playerAttack(it) }
+                ?: level.damageSources().mobAttack(b.attacker)
             b.target.hurt(source, beamDamageFor(b.target))
             val aoe = AABB(end, end).inflate(AOE_RADIUS)
             for (other in level.getEntitiesOfClass(LivingEntity::class.java, aoe)) {
-                if (other === b.target || other is Enemy) continue
+                if (other === b.target || other === b.attacker || other.isAlliedTo(b.attacker)) continue
                 other.hurt(source, beamDamageFor(other) * 0.5F)
             }
         }
@@ -119,12 +121,16 @@ object BeamTicker {
     }
 
     private fun beamDamageFor(victim: LivingEntity): Float =
-        if (victim.getMaxHealth() > PERCENT_HEALTH_THRESHOLD) victim.getMaxHealth() * PERCENT_DAMAGE
-        else FIXED_DAMAGE
+        if (victim.getMaxHealth() > PERCENT_HEALTH_THRESHOLD) {
+            (victim.getMaxHealth() * PERCENT_DAMAGE).coerceAtMost(MAX_PERCENT_DAMAGE)
+        } else {
+            FIXED_DAMAGE
+        }
 
     private const val DAMAGE_INTERVAL = 2
     const val AOE_RADIUS = 2.5
     const val FIXED_DAMAGE = 8.0F
     const val PERCENT_HEALTH_THRESHOLD = 100.0F
     const val PERCENT_DAMAGE = 0.2F
+    const val MAX_PERCENT_DAMAGE = 25.0F
 }

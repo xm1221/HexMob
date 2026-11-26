@@ -21,36 +21,39 @@ import pub.pigeon.yggdyy.hexmob.registry.HexMobTags
  */
 class UrCircleTargetGoal(private val circle: UrCircleEntity) : TargetGoal(circle, true) {
 
+    private fun isValidTarget(entity: LivingEntity): Boolean =
+        entity.isAlive && !(entity is Player && (entity.isCreative || entity.isSpectator))
+
     override fun canUse(): Boolean {
         if (!circle.isAwake()) return false // 沉睡：不索敌
         rescanIfDue()
         val t = circle.target ?: return false
-        return t.isAlive
+        return isValidTarget(t)
     }
 
     override fun canContinueToUse(): Boolean {
         if (!circle.isAwake()) return false
         rescanIfDue()
         val t = circle.target ?: return false
-        return t.isAlive && circle.distanceToSqr(t) <= FOLLOW_RANGE * FOLLOW_RANGE
+        return isValidTarget(t) && circle.distanceToSqr(t) <= FOLLOW_RANGE * FOLLOW_RANGE
     }
 
     override fun tick() {
         rescanIfDue()
     }
 
-    /** 每 10 tick 重扫：仅当没有存活目标时才重新锁定（跳过创造模式玩家）。
+    /** 每 10 tick 重扫：仅当没有存活目标时才重新锁定（跳过创造/旁观模式玩家）。
      *  多目标时按优先级选：**最优先玩家、其次剩余生命值最高**（见 UrCircleEntity.preferredTargets）。 */
     private fun rescanIfDue() {
         if (circle.tickCount % 10 != 0) return
         val cur = circle.target
-        if (cur != null && cur.isAlive) return
+        if (cur != null && isValidTarget(cur)) return
         val target = circle.preferredTargets(
             circle.level()
                 .getEntitiesOfClass(LivingEntity::class.java, circle.boundingBox.inflate(SCAN_RANGE))
                 .filter {
-                    it.isAlive && it !== circle &&
-                        !(it is Player && it.isCreative) &&
+                    it !== circle &&
+                        isValidTarget(it) &&
                         it.type.`is`(HexMobTags.EntityTypeTags.WISE)
                 }
         ).firstOrNull()
@@ -62,8 +65,8 @@ class UrCircleTargetGoal(private val circle: UrCircleEntity) : TargetGoal(circle
 
     companion object {
         /** 索敌扫描范围（格）：每 10 tick 扫此半径内 wise 生物。 */
-        const val SCAN_RANGE = 48.0
-        /** 跟随范围（格）：超过后放弃当前目标（须大于扫描范围，避免追到一半掉锁）。 */
-        const val FOLLOW_RANGE = 56.0
+        const val SCAN_RANGE = 80.0
+        /** 跟随范围（格）：超过后放弃当前目标（覆盖二/三阶段 74.2 格作战距离，避免脱锁抖动）。 */
+        const val FOLLOW_RANGE = 96.0
     }
 }

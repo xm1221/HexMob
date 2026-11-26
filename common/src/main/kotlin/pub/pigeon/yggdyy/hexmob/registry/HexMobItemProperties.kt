@@ -31,6 +31,9 @@ object HexMobItemProperties {
             { stack: ItemStack, tintIndex: Int -> (stack.item as SpawnEggItem).getColor(tintIndex) },
             HexMobItems.IOTA_SHEEP_SPAWN_EGG.get(),
             HexMobItems.QUENCH_ALLAY_SPAWN_EGG.get(),
+            HexMobItems.GUARD_ARCHER_SPAWN_EGG.get(),
+            HexMobItems.GUARD_BRUTE_SPAWN_EGG.get(),
+            HexMobItems.GUARD_GOLEM_SPAWN_EGG.get(),
         )
     }
 }

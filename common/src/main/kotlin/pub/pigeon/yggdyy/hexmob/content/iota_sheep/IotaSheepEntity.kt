@@ -153,15 +153,18 @@ class IotaSheepEntity(entityType: EntityType<IotaSheepEntity>, world: Level) : S
         val r = (argb shr 16 and 0xFF) / 255f
         val g = (argb shr 8 and 0xFF) / 255f
         val b = (argb and 0xFF) / 255f
-        repeat(count) {
-            world.addParticle(
-                DustParticleOptions(Vector3f(r, g, b), 1.0f),
-                x + (random.nextDouble() - 0.5) * spread,
-                y + 0.4 + (random.nextDouble() - 0.5) * spread,
-                z + (random.nextDouble() - 0.5) * spread,
-                0.0, 0.0, 0.0,
-            )
-        }
+        val halfSpread = spread * 0.5
+        world.sendParticles(
+            DustParticleOptions(Vector3f(r, g, b), 1.0f),
+            x,
+            y + 0.4,
+            z,
+            count,
+            halfSpread,
+            halfSpread,
+            halfSpread,
+            0.0,
+        )
     }
 
     // Cooler write -> burst + chime

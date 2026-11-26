@@ -15,6 +15,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.GameRules
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.state.BlockState
 import pub.pigeon.yggdyy.hexmob.config.HexMobServerConfig
 
 private val HEX_AMETHYST_BLOCKS = TagKey.create(Registries.BLOCK, ResourceLocation("hexcasting", "amethyst_blocks"))
@@ -34,6 +35,7 @@ fun craterAround(
     drop: Boolean = true,
     skipHexStones: Boolean = false,
     convertChance: Float = 0.0F,
+    canBreak: ((BlockPos, BlockState) -> Boolean)? = null,
 ) {
     if (!canUrCircleGrief(level)) {
         val rng = level.random
@@ -58,6 +60,7 @@ fun craterAround(
         if (state.isAir || !state.fluidState.isEmpty) continue
         if (state.getDestroySpeed(level, p) < 0.0F) continue
         if (skipHexStones && (state.`is`(HEX_AMETHYST_BLOCKS) || state.`is`(HEX_SLATE_BLOCKS))) continue
+        if (canBreak != null && !canBreak(p, state)) continue
         if (convertChance > 0.0F && level.random.nextFloat() < convertChance) {
             val converted = if (level.random.nextBoolean()) {
                 Blocks.AMETHYST_BLOCK.defaultBlockState()
@@ -99,8 +102,10 @@ object TempAmethystTracker {
                 continue
             }
             if (level.gameTime < e.expireGameTime) continue
+            // 区块未加载时保留条目，等待重新加载后再清理临时紫水晶块
+            if (!level.isLoaded(e.pos)) continue
             it.remove()
-            if (level.isLoaded(e.pos) && level.getBlockState(e.pos).`is`(Blocks.AMETHYST_BLOCK)) {
+            if (level.getBlockState(e.pos).`is`(Blocks.AMETHYST_BLOCK)) {
                 level.setBlockAndUpdate(e.pos, Blocks.AIR.defaultBlockState())
                 UrCircleHexVfx.spawnConjure(
                     level,

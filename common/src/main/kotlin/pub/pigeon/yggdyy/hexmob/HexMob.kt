@@ -24,6 +24,8 @@ object HexMob {
     fun init() {
         if(LOGGER.isDebugEnabled) LOGGER.warn("Common Init")
         HexMobServerConfig.init()
+        // 放在 init() 而非 initServer()，确保集成服务端（单人/局域网联机）也能在玩家加入时同步配置
+        HexMobServerConfig.initServer()
         HexMobCommands.init()
         // Hex actions are registered per-platform in each platform's entrypoint
         // (the common @ExpectPlatform path was not being transformed at runtime).
@@ -52,6 +54,6 @@ object HexMob {
         }
     }
     fun initServer() {
-        HexMobServerConfig.initServer()
+        // 保留空兼容入口：配置同步已迁入 init()，避免专服重复注册同时覆盖集成服务端联机
     }
 }

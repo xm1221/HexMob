@@ -24,7 +24,7 @@ public class GeodeFeatureMixin {
                     for(int k = -12; k <= 12; k += 4) {
                         BlockPos now = context.origin().offset(i, j, k);
                         ServerLevelAccessor level = context.level();
-                        if(level.getBlockState(now).isAir()) {
+                        if(!level.isOutsideBuildHeight(now) && level.getBlockState(now).isAir()) {
                             var tmp = now;
                             while(!level.isOutsideBuildHeight(tmp) && level.getBlockState(tmp).isAir()) tmp = tmp.below();
                             if(!level.getBlockState(tmp).is(HexMobTags.BlockTags.INSTANCE.getGEODE_WALL())) {

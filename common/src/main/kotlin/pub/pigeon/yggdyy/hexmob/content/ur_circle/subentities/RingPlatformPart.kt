@@ -19,5 +19,6 @@ class RingPlatformPart(
         walkPlatform = true
     }
 
+    override fun isPickable(): Boolean = false
     override fun shouldRenderAsPart(): Boolean = false
 }

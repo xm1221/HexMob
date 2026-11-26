@@ -5,6 +5,7 @@ import at.petrak.hexcasting.common.lib.HexSounds
 import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.monster.Enemy
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
@@ -52,11 +53,11 @@ class RingSpinSkill : UrCircleSkill("ring_spin", CHANNEL_TICKS) {
         val hull = circle.getPartsBoundingBox()
         val parts = circle.getAllParts()
         for (victim in level.getEntitiesOfClass(LivingEntity::class.java, hull)) {
-            if (victim === circle || isUrCircleAlly(victim) || hitCooldowns.containsKey(victim.uuid)) continue
+            if (victim === circle || victim is Enemy || isUrCircleAlly(victim) || hitCooldowns.containsKey(victim.uuid)) continue
             val vc = victim.position().add(0.0, victim.bbHeight / 2.0, 0.0)
             var hit = false
             for (part in parts) {
-                if (!part.active || part.posNow == Vec3.ZERO) continue
+                if (!part.active || part.walkPlatform || part.posNow == Vec3.ZERO) continue
                 val r = part.bbWidth * 0.65 + victim.bbWidth * 0.5 + 0.5
                 if (part.posNow.distanceToSqr(vc) <= r * r) {
                     hit = true
@@ -72,7 +73,7 @@ class RingSpinSkill : UrCircleSkill("ring_spin", CHANNEL_TICKS) {
 
         val pullR = (circle.ringOuterRadius() * 1.15).coerceAtMost(MAX_PULL_RADIUS)
         for (victim in level.getEntitiesOfClass(LivingEntity::class.java, AABB(origin, origin).inflate(pullR))) {
-            if (victim === circle || isUrCircleAlly(victim)) continue
+            if (victim === circle || victim is Enemy || isUrCircleAlly(victim)) continue
             val toCenter = origin.subtract(victim.position())
             val dist = toCenter.length()
             if (dist < 1.5) continue
@@ -96,6 +97,10 @@ class RingSpinSkill : UrCircleSkill("ring_spin", CHANNEL_TICKS) {
     }
 
     override fun cast(circle: UrCircleEntity) {}
+
+    override fun onChannelCancel(circle: UrCircleEntity) {
+        hitCooldowns.clear()
+    }
 
     override fun channelDamageMultiplier(circle: UrCircleEntity): Float = 0.9F
 

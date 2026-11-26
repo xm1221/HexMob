@@ -137,6 +137,10 @@ class DiveGrindSkill : UrCircleSkill("dive_grind", CHANNEL_TICKS) {
         UrCircleHexVfx.playRingSound(circle.level(), circle.position(), circle.ringOuterRadius(), HexSounds.CAST_NORMAL, 1.8F, 1.1F)
     }
 
+    override fun onChannelCancel(circle: UrCircleEntity) {
+        circle.targetFoldProgress = 0.0F
+    }
+
     companion object {
         const val CHANNEL_TICKS = 50
         const val DIVE_TICKS = 14

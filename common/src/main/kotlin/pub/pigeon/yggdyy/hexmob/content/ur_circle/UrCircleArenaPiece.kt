@@ -19,6 +19,7 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.BlockIgnorePr
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager
+import pub.pigeon.yggdyy.hexmob.content.IHMMultipartEntity
 import pub.pigeon.yggdyy.hexmob.registry.HexMobEntities
 import pub.pigeon.yggdyy.hexmob.registry.HexMobStructurePieceTypes
 
@@ -90,7 +91,14 @@ class UrCircleArenaPiece private constructor(box: BoundingBox) :
         val boss = UrCircleEntity(HexMobEntities.UR_CIRCLE.get(), level.level)
         boss.setPos(pos.x + 5.0, pos.y + 3.0, pos.z + 5.0)
         boss.setDormant(true)
-        level.addFreshEntityWithPassengers(boss)
+        try {
+            level.addFreshEntityWithPassengers(boss)
+        } finally {
+            // WorldGenRegion 区块生成阶段仅将实体序列化进 ProtoChunk 后丢弃，不会触发 boss.remove()
+            if (level !== level.level) {
+                IHMMultipartEntity.instances.remove(boss)
+            }
+        }
     }
 
     override fun getType(): StructurePieceType = HexMobStructurePieceTypes.UR_CIRCLE_ARENA.get()

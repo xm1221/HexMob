@@ -43,6 +43,37 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
         return circle.phase >= 2 && t != null && t.isAlive
     }
 
+    private fun updateSlicePlane(circle: UrCircleEntity) {
+        val center = circle.beamOrigin()
+        val t = circle.target
+        val targetCenter = t?.position()?.add(0.0, t.bbHeight / 2.0, 0.0) ?: center.add(1.0, 0.0, 0.0)
+        val aim = circle.findSymbolicSlate(SlateSymbolType.AIM)
+        val anchorPos = when {
+            aim != null && !aim.rebounded && aim.posNow != Vec3.ZERO -> aim.posNow
+            planeOrigin != Vec3.ZERO -> planeOrigin
+            else -> targetCenter
+        }
+        val toTarget = anchorPos.subtract(center)
+        val horiz = Vec3(toTarget.x, 0.0, toTarget.z)
+        val right = if (horiz.lengthSqr() > 1.0E-4) {
+            horiz.cross(Vec3(0.0, 1.0, 0.0)).let {
+                if (it.lengthSqr() > 1.0E-6) it.normalize() else Vec3(1.0, 0.0, 0.0)
+            }
+        } else {
+            Vec3(1.0, 0.0, 0.0)
+        }
+        val dirToTarget = if (toTarget.lengthSqr() > 1.0E-4) toTarget.normalize() else Vec3(0.0, 0.0, 1.0)
+        val rawNormal = dirToTarget.cross(right)
+        // 平面原点取 anchorPos，使平面同时穿过 center 与 anchorPos 并围绕目标展开
+        planeOrigin = anchorPos
+        planeNormal = if (rawNormal.lengthSqr() > 1.0E-6) rawNormal.normalize() else Vec3(0.0, 1.0, 0.0)
+        planeAxisU = right
+        planeAxisV = planeNormal.cross(planeAxisU).let {
+            if (it.lengthSqr() > 1.0E-6) it.normalize() else Vec3(0.0, 0.0, 1.0)
+        }
+        planeRadius = maxOf(circle.ringOuterRadius(), toTarget.length() + 12.0, 24.0)
+    }
+
     override fun onChannelTick(circle: UrCircleEntity) {
         val center = circle.beamOrigin()
         val t = circle.target
@@ -52,16 +83,7 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
             aim = circle.deploySymbolicSlate(SlateSymbolType.AIM, Vec3(targetCenter.x, targetCenter.y + 0.4, targetCenter.z))
             circle.deploySymbolicSlate(SlateSymbolType.AMP, null, preferredRing = 0)
         }
-        val anchorPos = aim?.posNow?.takeIf { it != Vec3.ZERO } ?: targetCenter
-        val toTarget = anchorPos.subtract(center)
-        val horiz = Vec3(toTarget.x, 0.0, toTarget.z)
-        val right = if (horiz.lengthSqr() > 1.0E-4) horiz.cross(Vec3(0.0, 1.0, 0.0)).normalize() else Vec3(1.0, 0.0, 0.0)
-        val dirToTarget = if (toTarget.lengthSqr() > 1.0E-4) toTarget.normalize() else Vec3(0.0, 0.0, 1.0)
-        planeOrigin = Vec3(center.x, anchorPos.y, center.z)
-        planeNormal = dirToTarget.cross(right).normalize()
-        planeAxisU = right
-        planeAxisV = planeNormal.cross(planeAxisU).normalize()
-        planeRadius = circle.ringOuterRadius().coerceAtLeast(24.0)
+        updateSlicePlane(circle)
 
         if (circle.stateTicks % 4 == 0) {
             emitPlaneRing(circle, UrCircleHexVfx.BEAM_LAVENDER, points = 32)
@@ -77,17 +99,30 @@ class PlaneSliceSkill : UrCircleSkill("plane_slice", CHANNEL_TICKS) {
     override fun beamTicks(circle: UrCircleEntity): Int = SLICE_DURATION
 
     override fun cast(circle: UrCircleEntity) {
-        circle.setPlaneSlicing(true, (planeOrigin.y - circle.y).toFloat())
+        updateSlicePlane(circle)
+        circle.setPlaneSlicing(true, planeOrigin.subtract(circle.position()), planeNormal)
         circle.beginBeam(this)
     }
 
     override fun onBeamEnd(circle: UrCircleEntity) {
-        circle.setPlaneSlicing(false, 0.0F)
+        planeOrigin = Vec3.ZERO
+        planeNormal = Vec3(0.0, 1.0, 0.0)
+        circle.setPlaneSlicing(false, Vec3.ZERO, Vec3(0.0, 1.0, 0.0))
+    }
+
+    override fun onChannelCancel(circle: UrCircleEntity) {
+        onBeamEnd(circle)
     }
 
     override fun onBeamTick(circle: UrCircleEntity) {
         val level = circle.level()
         if (level.isClientSide) return
+        val aim = circle.findSymbolicSlate(SlateSymbolType.AIM)
+        if (aim != null && !aim.rebounded && aim.posNow != Vec3.ZERO) {
+            updateSlicePlane(circle)
+        }
+        circle.setPlaneSlicing(true, planeOrigin.subtract(circle.position()), planeNormal)
+
         val progress = (circle.stateTicks.toFloat() / SLICE_DURATION).coerceIn(0F, 1F)
         val sweepAngle = progress * Math.PI * 2.0
 

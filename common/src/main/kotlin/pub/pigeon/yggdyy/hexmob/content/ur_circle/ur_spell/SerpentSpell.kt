@@ -62,7 +62,11 @@ class SerpentSpell : UrCircleSpell() {
                     serpent.setPos(pos.x + cos(ang) * 0.6, pos.y, pos.z + sin(ang) * 0.6)
                     val spread = (i - (LATERAL_COUNT - 1) / 2.0) * FAN_ANGLE
                     val v = rotateY(aim, spread)
-                    serpent.setAim(v.x + JITTER, v.y + JITTER, v.z + JITTER)
+                    serpent.setAim(
+                        v.x + (rng.nextDouble() - 0.5) * JITTER,
+                        v.y + (rng.nextDouble() - 0.5) * JITTER,
+                        v.z + (rng.nextDouble() - 0.5) * JITTER,
+                    )
                     level.addFreshEntity(serpent)
                 }
             }

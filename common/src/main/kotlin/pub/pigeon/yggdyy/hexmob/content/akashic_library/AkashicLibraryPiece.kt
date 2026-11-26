@@ -46,7 +46,7 @@ class AkashicLibraryPiece: StrongholdPieces.Library {
         placeLowerPillars(level, random, box)
         placeLowerLigatures(level, box)
         placeLowerDecorations(level, box)
-        placeLowerBookshelves(level)
+        placeLowerBookshelves(level, box)
         placeLowerChest(level, random, box)
     }
     private fun placeLowerPillars(level: WorldGenLevel, random: RandomSource, box: BoundingBox) {
@@ -97,11 +97,11 @@ class AkashicLibraryPiece: StrongholdPieces.Library {
             placeBlock(level, leaves[idx], x, 4, z, box)
         }
     }
-    private fun placeLowerBookshelves(level: WorldGenLevel) {
+    private fun placeLowerBookshelves(level: WorldGenLevel, box: BoundingBox) {
         for(z in 2..12 step 2) {
             for(y in 1..4) {
-                placeAkashicBookshelf(level, Direction.EAST, 1, y, z)
-                placeAkashicBookshelf(level, Direction.WEST, 12, y, z)
+                placeAkashicBookshelf(level, Direction.EAST, 1, y, z, box)
+                placeAkashicBookshelf(level, Direction.WEST, 12, y, z, box)
             }
         }
     }
@@ -117,8 +117,8 @@ class AkashicLibraryPiece: StrongholdPieces.Library {
         placeUpperPillars(level, random, box)
         placeUpperLigatures(level, box)
         placeUpperDecorations(level, box)
-        placeUpperBookshelves(level)
-        placeUpperChest(level, structureManager, generator, random, box, chunkPos, pos)
+        placeUpperBookshelves(level, box)
+        placeUpperChest(level, random, box)
     }
     private fun placeUpperFloor(level: WorldGenLevel, random: RandomSource, box: BoundingBox) {
         generateBox(level, box, 1, 5, 1, 12, 5, 2, false, random, AKASHIC_PLANKS_SELECTOR)
@@ -162,23 +162,26 @@ class AkashicLibraryPiece: StrongholdPieces.Library {
                 generateBox(level, box, x, 8, z, x, 9, z, fence, fence, false)
             }
         }
-        val ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH)
-        generateBox(level, box, 10, 1, 13, 10, 5, 13, ladder, ladder, false)
+        // 梯子贴南侧背墙 (z=14) 并面向室内 (-Z / NORTH)，按原版图书馆延伸至 y=7 以免卡在二楼洞口
+        val ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH)
+        generateBox(level, box, 10, 1, 13, 10, 7, 13, ladder, ladder, false)
     }
-    private fun placeUpperBookshelves(level: WorldGenLevel) {
+    private fun placeUpperBookshelves(level: WorldGenLevel, box: BoundingBox) {
         for(z in 2..12 step 2) {
             for(y in 6..9) {
-                placeAkashicBookshelf(level, Direction.EAST, 1, y, z)
-                placeAkashicBookshelf(level, Direction.WEST, 12, y, z)
+                placeAkashicBookshelf(level, Direction.EAST, 1, y, z, box)
+                placeAkashicBookshelf(level, Direction.WEST, 12, y, z, box)
             }
         }
     }
-    private fun placeUpperChest(level: WorldGenLevel, structureManager: StructureManager, generator: ChunkGenerator, random: RandomSource, box: BoundingBox, chunkPos: ChunkPos, pos: BlockPos) {
-
+    private fun placeUpperChest(level: WorldGenLevel, random: RandomSource, box: BoundingBox) {
+        createChest(level, box, random, 2, 6, 1, HexMob.id("chests/akashic_library"))
+        createChest(level, box, random, 11, 6, 1, HexMob.id("chests/akashic_library"))
     }
-    private fun placeAkashicBookshelf(level: WorldGenLevel, direction: Direction, x: Int, y: Int, z: Int) {
-        val shelf: BlockState = HexBlocks.AKASHIC_BOOKSHELF.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, direction).mirror(mirror).rotate(rotation)
+    private fun placeAkashicBookshelf(level: WorldGenLevel, direction: Direction, x: Int, y: Int, z: Int, box: BoundingBox) {
         val pos: BlockPos = getWorldPos(x, y, z)
+        if (!box.isInside(pos)) return
+        val shelf: BlockState = HexBlocks.AKASHIC_BOOKSHELF.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, direction).mirror(mirror).rotate(rotation)
         level.setBlock(pos, shelf, 2)
     }
     override fun getType(): StructurePieceType {

@@ -77,26 +77,33 @@ class OrbitalBarrageSkill : UrCircleSkill("orbital_barrage", CHANNEL_TICKS) {
     }
 
     override fun cast(circle: UrCircleEntity) {
-        val level = circle.level()
-        if (level.isClientSide) return
-        val sourceRing = if (circle.phase >= 2 && circle.rings.size > 2) circle.rings[2].parts else circle.ecliptic
-        val slateParts = sourceRing.filterIsInstance<SlatePart>().filter { it.active && it.posNow != Vec3.ZERO }
-        if (slateParts.isEmpty() || strikeZones.isEmpty()) return
+        try {
+            val level = circle.level()
+            if (level.isClientSide) return
+            val sourceRing = if (circle.phase >= 2 && circle.rings.size > 2) circle.rings[2].parts else circle.ecliptic
+            val slateParts = sourceRing.filterIsInstance<SlatePart>().filter { it.active && it.posNow != Vec3.ZERO }
+            if (slateParts.isEmpty() || strikeZones.isEmpty()) return
 
-        val projScale = if (circle.phase >= 2) 1.5F else 1.0F
-        for ((idx, zone) in strikeZones.withIndex()) {
-            val part = slateParts[(idx * 3) % slateParts.size]
-            val from = part.posNow
-            val projectile = SlateProjectile(HexMobEntities.SLATE_PROJECTILE.get(), level)
-            projectile.setPos(from.x, from.y, from.z)
-            projectile.owner = circle
-            projectile.pattern = part.pattern
-            projectile.visualScale = projScale
-            val aim = zone.add(0.0, 0.3, 0.0).subtract(from)
-            projectile.shoot(aim.x, aim.y, aim.z, PROJECTILE_SPEED, 1.2F)
-            level.addFreshEntity(projectile)
-            UrCircleHexVfx.spawnRingArc(level, from, from.add(aim.normalize().scale(3.0)), UrCircleHexVfx.AMETHYST_VIOLET, steps = 5)
+            val projScale = if (circle.phase >= 2) 1.5F else 1.0F
+            for ((idx, zone) in strikeZones.withIndex()) {
+                val part = slateParts[(idx * 3) % slateParts.size]
+                val from = part.posNow
+                val projectile = SlateProjectile(HexMobEntities.SLATE_PROJECTILE.get(), level)
+                projectile.setPos(from.x, from.y, from.z)
+                projectile.owner = circle
+                projectile.pattern = part.pattern
+                projectile.visualScale = projScale
+                val aim = zone.add(0.0, 0.3, 0.0).subtract(from)
+                projectile.shoot(aim.x, aim.y, aim.z, PROJECTILE_SPEED, 1.2F)
+                level.addFreshEntity(projectile)
+                UrCircleHexVfx.spawnRingArc(level, from, from.add(aim.normalize().scale(3.0)), UrCircleHexVfx.AMETHYST_VIOLET, steps = 5)
+            }
+        } finally {
+            strikeZones.clear()
         }
+    }
+
+    override fun onChannelCancel(circle: UrCircleEntity) {
         strikeZones.clear()
     }
 

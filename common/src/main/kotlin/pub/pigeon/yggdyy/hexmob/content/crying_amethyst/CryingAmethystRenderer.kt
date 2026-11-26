@@ -51,7 +51,9 @@ class CryingAmethystRenderer(val context: EntityRendererProvider.Context) : Enti
             ModelResourceLocation("minecraft", "amethyst_cluster", "facing=up,waterlogged=false"),
         )
         private val budSupplier: Function<CryingAmethystEntity, BakedModel> = Function { entity ->
-            val idx: Int = (entity.health / (entity.maxHealth + 0.1F) * 4F).toInt()
+            val denom = entity.maxHealth.coerceAtLeast(0.1F) + 0.1F
+            val raw = (entity.health / denom) * 4F
+            val idx: Int = if (raw.isNaN()) 0 else raw.toInt().coerceIn(0, 3)
             getBakedModel(buds[idx])
         }
     }

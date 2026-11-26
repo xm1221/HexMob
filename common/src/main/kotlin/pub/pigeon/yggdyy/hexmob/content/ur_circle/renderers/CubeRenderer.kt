@@ -29,7 +29,7 @@ class CubeRenderer(id: ResourceLocation) : PartRenderer(id) {
         val circle = cube.parentMob
         if (circle.isPartVanishedInDeath(cube)) return
 
-        val model: BakedModel = context.modelManager.getModel(ModelResourceLocation(cube.modelId, effectiveVariant(cube)))
+        val model: BakedModel = context.modelManager.getModel(effectiveModelLocation(cube))
         poseStack.pushPose()
         val s = circle.partVisualScale(cube)
         val w = cube.baseWidth * s
@@ -48,24 +48,40 @@ class CubeRenderer(id: ResourceLocation) : PartRenderer(id) {
         poseStack.popPose()
     }
 
-    private fun effectiveVariant(cube: CubePart): String {
+    private fun effectiveModelLocation(cube: CubePart): ModelResourceLocation {
+        val cached = MODEL_CACHE.getOrPut(ModelKey(cube.modelId, cube.modelVariant)) {
+            val baseLoc = ModelResourceLocation(cube.modelId, cube.modelVariant)
+            val trueVar = cube.modelVariant.replace(ENERGIZED_REGEX, "energized=true")
+            val falseVar = cube.modelVariant.replace(ENERGIZED_REGEX, "energized=false")
+            val trueLoc = if (trueVar == cube.modelVariant) baseLoc else ModelResourceLocation(cube.modelId, trueVar)
+            val falseLoc = if (falseVar == cube.modelVariant) baseLoc else ModelResourceLocation(cube.modelId, falseVar)
+            CachedCubeModels(baseLoc, trueLoc, falseLoc)
+        }
         val circle = cube.parentMob
-        if (cube === circle.earth) return cube.modelVariant
+        if (cube === circle.earth) return cached.normal
         if (circle.isPartExtinguishedInDeath(cube) || circle.circleState == CircleState.SHORT_CIRCUIT) {
-            return cube.modelVariant.replace(ENERGIZED_REGEX, "energized=false")
+            return cached.energizedFalse
         }
         if (circle.hasEffect(MobEffects.GLOWING) || circle.isSiphoning() || circle.circleState == CircleState.PHASE_TRANSITION) {
-            return cube.modelVariant.replace(ENERGIZED_REGEX, "energized=true")
+            return cached.energizedTrue
         }
         if (circle.circleState == CircleState.CHANNELING) {
             val idx = cube.globalIndex.coerceAtLeast(0)
             val on = (idx + circle.stateTicks / 2) % 2 == 0
-            return cube.modelVariant.replace(ENERGIZED_REGEX, if (on) "energized=true" else "energized=false")
+            return if (on) cached.energizedTrue else cached.energizedFalse
         }
-        return cube.modelVariant
+        return cached.normal
     }
+
+    private data class ModelKey(val modelId: ResourceLocation, val variant: String)
+    private class CachedCubeModels(
+        val normal: ModelResourceLocation,
+        val energizedTrue: ModelResourceLocation,
+        val energizedFalse: ModelResourceLocation,
+    )
 
     companion object {
         private val ENERGIZED_REGEX = Regex("energized=(true|false)")
+        private val MODEL_CACHE = HashMap<ModelKey, CachedCubeModels>(16)
     }
 }

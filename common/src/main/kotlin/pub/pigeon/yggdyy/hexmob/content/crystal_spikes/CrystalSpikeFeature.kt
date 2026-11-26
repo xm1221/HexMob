@@ -126,9 +126,7 @@ class CrystalSpikeFeature : Feature<NoneFeatureConfiguration>(NoneFeatureConfigu
                 }
                 while (pos.y > 50) {
                     val st = level.getBlockState(pos)
-                    if (st.isAir || isGroundDirt(st) || st.`is`(Blocks.SNOW_BLOCK) || st.`is`(Blocks.ICE)
-                        || st.`is`(Blocks.DEEPSLATE) || st.`is`(Blocks.STONE)
-                    ) {
+                    if (isSpikeReplaceable(st)) {
                         setBlock(level, pos, slates[random.nextInt(slates.size)])
                         pos = pos.below()
                         j--
@@ -144,17 +142,14 @@ class CrystalSpikeFeature : Feature<NoneFeatureConfiguration>(NoneFeatureConfigu
         }
     }
 
-    /** 只在"可替换"位置放尖柱块（空气/泥土类/雪/冰/深板岩/石头），不盖掉突兀的东西。 */
+    /** 只在"可替换"位置放尖柱块（空气/泥土类/雪/冰/深板岩/石头/板岩块），不盖掉突兀的东西。 */
     private fun placeSpikeBlock(level: WorldGenLevel, pos: BlockPos, state: BlockState) {
-        val st = level.getBlockState(pos)
-        if (st.isAir || isGroundDirt(st) || st.`is`(Blocks.SNOW_BLOCK) || st.`is`(Blocks.ICE)
-            || st.`is`(Blocks.DEEPSLATE) || st.`is`(Blocks.STONE)
-        ) {
+        if (isSpikeReplaceable(level.getBlockState(pos))) {
             setBlock(level, pos, state)
         }
     }
 
-    /** 板岩台地斑块：地表圆盘（半径 3~5、厚 1~2），把深板岩/泥土表层换成板岩块们。 */
+    /** 板岩台地斑块：地表圆盘（半径 3~5、厚 1~2），把深板岩/泥土/板岩表层换成板岩块们。 */
     private fun placeSlatePad(level: WorldGenLevel, origin: BlockPos, random: RandomSource, slates: List<BlockState>) {
         val radius = 3 + random.nextInt(3)
         val depth = 1 + random.nextInt(2)
@@ -166,10 +161,7 @@ class CrystalSpikeFeature : Feature<NoneFeatureConfiguration>(NoneFeatureConfigu
                 val surfY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cx + dx, cz + dz)
                 for (dy in 0 until depth) {
                     val pos = BlockPos(cx + dx, surfY - dy, cz + dz)
-                    val st = level.getBlockState(pos)
-                    if (st.isAir || isGroundDirt(st) || st.`is`(Blocks.SNOW_BLOCK) || st.`is`(Blocks.ICE)
-                        || st.`is`(Blocks.DEEPSLATE) || st.`is`(Blocks.STONE)
-                    ) {
+                    if (isSpikeReplaceable(level.getBlockState(pos))) {
                         setBlock(level, pos, slates[random.nextInt(slates.size)])
                     }
                 }
@@ -221,16 +213,21 @@ class CrystalSpikeFeature : Feature<NoneFeatureConfiguration>(NoneFeatureConfigu
         repeat(count) {
             val x = origin.x + random.nextInt(17) - 8
             val z = origin.z + random.nextInt(17) - 8
-            val y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+            val y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1
+            if (y < level.minBuildHeight) return@repeat
             val pos = BlockPos(x, y, z)
             val st = level.getBlockState(pos)
-            if (st.isAir || isGroundDirt(st) || st.`is`(Blocks.DEEPSLATE) || st.`is`(Blocks.STONE)
-                || st.`is`(HexBlocks.SLATE_BLOCK)
+            if (isGroundDirt(st) || st.`is`(Blocks.DEEPSLATE) || st.`is`(Blocks.STONE)
+                || st.`is`(HexBlocks.SLATE_BLOCK) || st.`is`(SLATE_TAG)
             ) {
                 setBlock(level, pos, decos[random.nextInt(decos.size)])
             }
         }
     }
+
+    private fun isSpikeReplaceable(st: BlockState): Boolean =
+        st.isAir || isGroundDirt(st) || st.`is`(Blocks.SNOW_BLOCK) || st.`is`(Blocks.ICE)
+            || st.`is`(Blocks.DEEPSLATE) || st.`is`(Blocks.STONE) || st.`is`(HexBlocks.SLATE_BLOCK)
 
     /** 从 hexcasting tag 里取"方块们"；tag 为空时退回单个基础方块。 */
     private fun tagBlocks(level: WorldGenLevel, tag: TagKey<Block>, fallback: Block): List<BlockState> {

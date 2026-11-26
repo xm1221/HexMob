@@ -26,7 +26,9 @@ import java.util.*
 
 class StimulatedPatternEntity(type: EntityType<StimulatedPatternEntity>, level: Level) : FlyingMob(type, level) {
     init {
+        isNoGravity = true
     }
+    override fun removeWhenFarAway(distanceToClosestPlayer: Double): Boolean = false
     override fun defineSynchedData() {
         super.defineSynchedData()
         this.entityData.define(PATTERN, HexPattern.fromAngles("", HexDir.EAST).serializeToNBT())
@@ -58,7 +60,7 @@ class StimulatedPatternEntity(type: EntityType<StimulatedPatternEntity>, level: 
     override fun tick() {
         super.tick()
         if(tickCount < 10 && !level().isClientSide && getPattern().angles.size <= 0) {
-            setPattern(HexActions.REGISTRY.getRandom(getRandom()).get().value().prototype)
+            HexActions.REGISTRY.getRandom(getRandom()).orElse(null)?.value()?.prototype?.let { setPattern(it) }
         }
     }
     override fun registerGoals() {
@@ -74,17 +76,23 @@ class StimulatedPatternEntity(type: EntityType<StimulatedPatternEntity>, level: 
         }
         fun spawnInGeode(context: FeaturePlaceContext<GeodeConfiguration>, sugPos: BlockPos) {
             try {
-                val entity = StimulatedPatternEntity(STIMULATED_PATTERN.get(), context.level().level)
+                val worldGenLevel = context.level()
+                val entity = StimulatedPatternEntity(STIMULATED_PATTERN.get(), worldGenLevel.level)
+                entity.isNoGravity = true
+                entity.setPersistenceRequired()
                 for (i in 0..10) {
                     val now: BlockPos = sugPos.offset(0, i, 0)
-                    if (context.level().getBlockState(now).isAir && !context.level().getBlockState(now.above()).isAir) {
+                    if (!worldGenLevel.isOutsideBuildHeight(now)
+                        && worldGenLevel.getBlockState(now).isAir
+                        && !worldGenLevel.getBlockState(now.above()).isAir
+                    ) {
                         entity.setPos(now.center.add(0.0, -0.5, 0.0))
-                        context.level().level.addFreshEntity(entity)
+                        worldGenLevel.addFreshEntity(entity)
                         return
                     }
                 }
-            } catch (ignored: Exception) {
-
+            } catch (e: Exception) {
+                HexMob.LOGGER.debug("Failed to spawn StimulatedPatternEntity in geode at {}", sugPos, e)
             }
         }
         private class RandomMoveGoal(val mob: FlyingMob, val interval: Int = 40): Goal() {
@@ -105,7 +113,7 @@ class StimulatedPatternEntity(type: EntityType<StimulatedPatternEntity>, level: 
                 super.start()
                 val target: Vec3 = Vec3(mob.random.nextGaussian(), mob.random.nextGaussian(), mob.random.nextGaussian()).normalize()
                 mob.setXxa(target.x.toFloat() * 0.3F)
-                mob.setYya((target.y.toFloat() - 0.3F) * 0.3F)
+                mob.setYya(target.y.toFloat() * 0.3F)
                 mob.setZza(target.z.toFloat() * 0.3F)
             }
             override fun canContinueToUse(): Boolean {

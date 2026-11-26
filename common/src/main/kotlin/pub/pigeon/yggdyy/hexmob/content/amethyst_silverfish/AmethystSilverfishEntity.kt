@@ -19,6 +19,7 @@ import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal
 import net.minecraft.world.entity.monster.Monster
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.GameRules
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 import pub.pigeon.yggdyy.hexmob.content.akashic_library.AmethystInfestedBlock
@@ -61,12 +62,16 @@ class AmethystSilverfishEntity(entityType: EntityType<out Monster>, level: Level
         val IS_FIGHTING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(AmethystSilverfishEntity::class.java, EntityDataSerializers.BOOLEAN)
         fun registerAttributes(): AttributeSupplier.Builder = createMonsterAttributes().add(Attributes.MAX_HEALTH, 5.0).add(Attributes.ATTACK_DAMAGE, 1.0).add(Attributes.MOVEMENT_SPEED, 0.2)
         class HideIntoBlockGoal(val silverfish: AmethystSilverfishEntity): Goal() {
-            override fun canUse(): Boolean = silverfish.random.nextInt(120) == 0 && (silverfish.target == null || !silverfish.target!!.isAlive)
+            override fun canUse(): Boolean =
+                silverfish.level().gameRules.getBoolean(GameRules.RULE_MOBGRIEFING) &&
+                    silverfish.random.nextInt(120) == 0 &&
+                    (silverfish.target == null || !silverfish.target!!.isAlive)
             override fun start() {
                 super.start()
+                val level: ServerLevel = silverfish.level() as? ServerLevel ?: return
+                if (!level.gameRules.getBoolean(GameRules.RULE_MOBGRIEFING)) return
                 val center: BlockPos = BlockPos.containing(silverfish.position())
                 val candidates: Iterable<BlockPos> = BlockPos.betweenClosed(center.offset(-1, -1, -1), center.offset(1, 1, 1))
-                val level: ServerLevel = silverfish.level() as? ServerLevel ?: return
                 for(p in candidates) {
                     val nowID: ResourceLocation = BuiltInRegistries.BLOCK.getKey(level.getBlockState(p).block)
                     val toState: BlockState = AmethystInfestedBlock.infestMap[nowID]?.let { BuiltInRegistries.BLOCK.get(it).defaultBlockState() } ?: continue

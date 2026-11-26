@@ -8,10 +8,14 @@ import at.petrak.hexcasting.api.utils.otherHand
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.ai.memory.MemoryModuleType
+import net.minecraft.world.entity.animal.allay.Allay
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
+import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.api.entity.extractMediaFromHands
 import java.util.function.Predicate
 
@@ -104,9 +108,22 @@ open class MobCastingEnv(
         particles?.sprayParticles(world, colorizer ?: FrozenPigment.DEFAULT.get())
     }
 
-    /** Mobs have no chat to print to; drop the message. */
+    /** Forward mishap/cast messages to the bound player (or nearby players) and debug log. */
     override fun printMessage(message: Component?) {
-        /* no-op */
+        if (message == null) return
+        HexMob.LOGGER.debug("MobCastingEnv [{}]: {}", caster.name.string, message.string)
+        val formatted = Component.literal("[").append(caster.displayName).append("] ").append(message)
+        val likedUuid = (caster as? Allay)?.brain?.getMemory(MemoryModuleType.LIKED_PLAYER)?.orElse(null)
+        if (likedUuid != null) {
+            val likedPlayer = world.server.playerList.getPlayer(likedUuid)
+            if (likedPlayer != null && likedPlayer.level() === world && likedPlayer.distanceToSqr(caster) <= 64.0 * 64.0) {
+                likedPlayer.sendSystemMessage(formatted)
+                return
+            }
+        }
+        for (player in world.getEntitiesOfClass(ServerPlayer::class.java, caster.boundingBox.inflate(32.0))) {
+            player.sendSystemMessage(formatted)
+        }
     }
 
     /**

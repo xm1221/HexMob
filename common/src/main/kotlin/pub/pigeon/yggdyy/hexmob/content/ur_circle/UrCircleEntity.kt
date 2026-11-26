@@ -200,8 +200,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     private var channelParticleTimer = 0
     private var skillCooldown = 0
 
-    private var backlash = 0
-    private var lastBacklashTick = 0
+    private val backlashByPlayer: MutableMap<UUID, Int> = HashMap()
+    private val lastBacklashTickByPlayer: MutableMap<UUID, Int> = HashMap()
     private var siphonTimer = 0
 
     private val hatedTargets: MutableList<LivingEntity> = mutableListOf()
@@ -242,6 +242,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         entityData.define(SIPHONING, false)
         entityData.define(SLICE_ACTIVE, false)
         entityData.define(SLICE_Y_OFFSET, 0.0F)
+        entityData.define(SLICE_OX, 0.0F)
+        entityData.define(SLICE_OY, 0.0F)
+        entityData.define(SLICE_OZ, 0.0F)
+        entityData.define(SLICE_NX, 0.0F)
+        entityData.define(SLICE_NY, 1.0F)
+        entityData.define(SLICE_NZ, 0.0F)
     }
 
     override fun aiStep() {
@@ -261,7 +267,11 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             }
 
             stateTicks += 1
-            hatedTargets.removeAll { !it.isAlive || it.isRemoved || it is Enemy || distanceToSqr(it) > HATE_RANGE * HATE_RANGE }
+            hatedTargets.removeAll {
+                !it.isAlive || it.isRemoved || it is Enemy ||
+                    (it is Player && (it.isCreative || it.isSpectator)) ||
+                    distanceToSqr(it) > HATE_RANGE * HATE_RANGE
+            }
             if (target == null) {
                 target = preferredTargets(currentHated()).firstOrNull()
             }
@@ -363,16 +373,45 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     fun setSiphoning(enabled: Boolean) {
         entityData.set(SIPHONING, enabled)
-        if (!enabled) backlash = 0
+        if (!enabled) {
+            backlashByPlayer.clear()
+            lastBacklashTickByPlayer.clear()
+        }
     }
 
     fun isPlaneSlicing(): Boolean = entityData.get(SLICE_ACTIVE)
 
     fun slicePlaneLocalY(): Float = entityData.get(SLICE_Y_OFFSET)
 
-    fun setPlaneSlicing(active: Boolean, localYOffset: Float) {
+    fun slicePlaneLocalOrigin(): Vec3 = Vec3(
+        entityData.get(SLICE_OX).toDouble(),
+        entityData.get(SLICE_OY).toDouble(),
+        entityData.get(SLICE_OZ).toDouble(),
+    )
+
+    fun slicePlaneNormal(): Vec3 {
+        val n = Vec3(
+            entityData.get(SLICE_NX).toDouble(),
+            entityData.get(SLICE_NY).toDouble(),
+            entityData.get(SLICE_NZ).toDouble(),
+        )
+        return if (n.lengthSqr() > 1.0E-6) n.normalize() else Vec3(0.0, 1.0, 0.0)
+    }
+
+    fun setPlaneSlicing(active: Boolean, localOrigin: Vec3, normal: Vec3) {
+        val safeNormal = if (normal.lengthSqr() > 1.0E-6) normal.normalize() else Vec3(0.0, 1.0, 0.0)
         entityData.set(SLICE_ACTIVE, active)
-        entityData.set(SLICE_Y_OFFSET, localYOffset)
+        entityData.set(SLICE_Y_OFFSET, localOrigin.y.toFloat())
+        entityData.set(SLICE_OX, localOrigin.x.toFloat())
+        entityData.set(SLICE_OY, localOrigin.y.toFloat())
+        entityData.set(SLICE_OZ, localOrigin.z.toFloat())
+        entityData.set(SLICE_NX, safeNormal.x.toFloat())
+        entityData.set(SLICE_NY, safeNormal.y.toFloat())
+        entityData.set(SLICE_NZ, safeNormal.z.toFloat())
+    }
+
+    fun setPlaneSlicing(active: Boolean, localYOffset: Float) {
+        setPlaneSlicing(active, Vec3(0.0, localYOffset.toDouble(), 0.0), Vec3(0.0, 1.0, 0.0))
     }
 
     fun ringRotation(ringIndex: Int): Float =
@@ -579,7 +618,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             val vc = victim.position().add(0.0, victim.bbHeight / 2.0, 0.0)
             var hit = false
             for (part in cachedAllParts) {
-                if (!part.active || part.posNow == Vec3.ZERO) continue
+                if (!part.active || part.walkPlatform || part.posNow == Vec3.ZERO) continue
                 val r = part.bbWidth * 0.6 + victim.bbWidth * 0.5 + 0.45
                 if (part.posNow.distanceToSqr(vc) <= r * r) {
                     hit = true
@@ -762,13 +801,26 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         super.remove(reason)
     }
 
+    private fun cancelActiveSkills() {
+        currentSkill?.onChannelCancel(this)
+        beamSkill?.let {
+            it.onBeamEnd(this)
+            it.onChannelCancel(this)
+        }
+        grindSkill?.let {
+            it.onGrindEnd(this)
+            it.onChannelCancel(this)
+        }
+        currentSkill = null
+        beamSkill = null
+        grindSkill = null
+    }
+
     override fun die(source: DamageSource) {
         if (circleState == CircleState.DYING) return
         circleState = CircleState.DYING
         stateTicks = 0
-        currentSkill = null
-        beamSkill = null
-        grindSkill = null
+        cancelActiveSkills()
         targetFoldProgress = 0.0F
         mediaWave.clear(this)
         setSiphoning(false)
@@ -777,8 +829,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         discardAnchors()
         bossEvent?.removeAllPlayers()
         bossEvent = null
-        for (s in level().getEntitiesOfClass(UrCircleServant::class.java, getBoundingBox().inflate(48.0))) {
+        val minionBox = getBoundingBox().inflate(64.0)
+        for (s in level().getEntitiesOfClass(UrCircleServant::class.java, minionBox)) {
             if (s.owner === this) s.remove(Entity.RemovalReason.KILLED)
+        }
+        for (g in level().getEntitiesOfClass(Mob::class.java, minionBox)) {
+            if (g is HexMobGuard && g.isSummonedBy(this)) g.remove(Entity.RemovalReason.KILLED)
         }
         hatedTargets.clear()
         target = null
@@ -1145,15 +1201,15 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             hudSyncDirty = true
             circleState = CircleState.CRUISE
             stateTicks = 0
+            // 断路易伤完整结束后再结算跨血线转阶段，避免吞掉刚打出的 5 秒易伤窗口
+            checkPhaseThresholds()
         }
     }
 
     fun beginPhase2Transition() {
         if (phase >= 2 || circleState == CircleState.DYING) return
         phase = 2
-        currentSkill = null
-        beamSkill = null
-        grindSkill = null
+        cancelActiveSkills()
         clearAllSymbolicSlates()
         targetFoldProgress = 1.0F
         mediaWave.clear(this)
@@ -1171,9 +1227,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         if (phase >= 3 || circleState == CircleState.DYING) return
         if (phase < 2) phase2Reveal = 1.0F
         phase = 3
-        currentSkill = null
-        beamSkill = null
-        grindSkill = null
+        cancelActiveSkills()
         clearAllSymbolicSlates()
         targetFoldProgress = 1.0F
         mediaWave.clear(this)
@@ -1189,9 +1243,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     fun triggerShortCircuit() {
         if (level().isClientSide || circleState == CircleState.DYING) return
-        currentSkill = null
-        beamSkill = null
-        grindSkill = null
+        cancelActiveSkills()
         clearAllSymbolicSlates()
         stability = 0
         hudSyncDirty = true
@@ -1230,8 +1282,6 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 (random.nextDouble() - 0.5) * 0.55,
             )
         }
-
-        checkPhaseThresholds()
     }
 
     private fun checkPhaseThresholds() {
@@ -1347,16 +1397,20 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                     unlockSlateTamperable(slate, slate.detachedPos, slate.detachedVel)
                 }
             } else if (slate.tamperable && !slate.rebounded) {
-                slate.detached = true
-                if (slate.detachedPos == Vec3.ZERO) slate.detachedPos = currentPos
-                slate.detachedVel = slate.detachedVel.scale(0.35).add(ext.scale(1.65))
+                if (!slate.detached) {
+                    slate.detached = true
+                    slate.detachedPos = currentPos
+                    slate.detachedVel = ext.scale(1.65)
+                } else {
+                    slate.detachedVel = slate.detachedVel.scale(0.35).add(ext.scale(1.65))
+                }
             }
         }
 
-        // 2. 主动飞出定点瞄准/追踪/触发窗口期：离开核心稳定区后自动切入可篡改态
-        if (!slate.tamperable && !slate.rebounded && slate.deployedPos != null && slate.deployTicks >= 12) {
+        // 2. 延时开放可篡改态但不强制 detached 冻结，保持追踪技能持续跟随目标直到玩家真实干扰
+        if (!slate.tamperable && !slate.rebounded && slate.deployedPos != null && slate.deployTicks >= 24) {
             if (slate.symbolType != SlateSymbolType.AMP || currentPos.distanceTo(origin) > ringInnerRadius() + 3.0) {
-                unlockSlateTamperable(slate, currentPos, Vec3.ZERO)
+                unlockSlateTamperable(slate, currentPos, Vec3.ZERO, detach = false)
             }
         }
 
@@ -1407,12 +1461,14 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         slate.changeState(finalPos, lookDir)
     }
 
-    private fun unlockSlateTamperable(slate: SlatePart, pos: Vec3, vel: Vec3) {
+    private fun unlockSlateTamperable(slate: SlatePart, pos: Vec3, vel: Vec3, detach: Boolean = true) {
         if (slate.tamperable) return
         slate.tamperable = true
-        slate.detached = true
-        slate.detachedPos = pos
-        slate.detachedVel = vel
+        if (detach) {
+            slate.detached = true
+            slate.detachedPos = pos
+            slate.detachedVel = vel
+        }
         hudSyncDirty = true
         UrCircleHexVfx.playRingSound(level(), pos, 32.0, HexSounds.ADD_TO_PATTERN, 1.8F, 1.45F)
         UrCircleHexVfx.spawnRingArc(level(), beamOrigin(), pos, UrCircleHexVfx.SIPHON_CYAN, steps = 10)
@@ -1461,8 +1517,10 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             die(level().damageSources().magic())
             return
         }
-        checkPhaseThresholds()
         reduceStability(stabilityCost, triggerInstantly = true)
+        if (circleState != CircleState.SHORT_CIRCUIT) {
+            checkPhaseThresholds()
+        }
     }
 
     private fun syncClientSlateFromHud(slate: SlatePart, nominalPos: Vec3, nominalDir: Vec3, origin: Vec3) {
@@ -1734,8 +1792,16 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     override fun addAdditionalSaveData(nbt: CompoundTag) {
         super.addAdditionalSaveData(nbt)
         nbt.putBoolean("hexmob:Dormant", dormant)
+        nbt.putBoolean("hexmob:WokenOnce", wokenOnce)
         nbt.putInt("hexmob:Phase", phase)
         nbt.putInt("hexmob:Stability", stability)
+        nbt.putString("hexmob:CircleState", circleState.name)
+        nbt.putInt("hexmob:StateTicks", stateTicks)
+        homePos?.let { home ->
+            nbt.putDouble("hexmob:HomeX", home.x)
+            nbt.putDouble("hexmob:HomeY", home.y)
+            nbt.putDouble("hexmob:HomeZ", home.z)
+        }
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -1762,23 +1828,82 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         } else {
             MAX_STABILITY
         }
+        if (compound.contains("hexmob:HomeX") && compound.contains("hexmob:HomeY") && compound.contains("hexmob:HomeZ")) {
+            homePos = Vec3(
+                compound.getDouble("hexmob:HomeX"),
+                compound.getDouble("hexmob:HomeY"),
+                compound.getDouble("hexmob:HomeZ"),
+            )
+        }
+        wokenOnce = if (compound.contains("hexmob:WokenOnce")) {
+            compound.getBoolean("hexmob:WokenOnce")
+        } else {
+            !dormant && (savedPhase > 1 || health < maxHealth)
+        }
+        val savedState = if (compound.contains("hexmob:CircleState")) {
+            runCatching { CircleState.valueOf(compound.getString("hexmob:CircleState")) }.getOrDefault(CircleState.CRUISE)
+        } else {
+            CircleState.CRUISE
+        }
+        val savedStateTicks = if (compound.contains("hexmob:StateTicks")) {
+            compound.getInt("hexmob:StateTicks").coerceAtLeast(0)
+        } else {
+            0
+        }
+        if (health <= 0.0F || savedState == CircleState.DYING) {
+            dormant = false
+            wokenOnce = true
+            entityData.set(DORMANT, false)
+            dormantFold = 0.0F
+            if (health > 0.0F) {
+                internalHealthWrite = true
+                try {
+                    setHealth(0.0F)
+                } finally {
+                    internalHealthWrite = false
+                }
+            }
+            circleState = CircleState.DYING
+            stateTicks = if (savedState == CircleState.DYING) savedStateTicks else 0
+            targetFoldProgress = if (stateTicks >= DEATH_COLLAPSE_TICK) 1.0F else 0.0F
+        } else {
+            when (savedState) {
+                CircleState.PHASE_TRANSITION, CircleState.SHORT_CIRCUIT -> {
+                    circleState = savedState
+                    stateTicks = savedStateTicks
+                    if (savedState == CircleState.PHASE_TRANSITION && savedStateTicks < PHASE_BURST_TICK) {
+                        if (savedPhase == 2) phase2Reveal = 0.0F
+                        if (savedPhase == 3) phase3Reveal = 0.0F
+                        targetFoldProgress = 1.0F
+                    } else {
+                        targetFoldProgress = 0.0F
+                    }
+                }
+                else -> {
+                    circleState = CircleState.CRUISE
+                    stateTicks = 0
+                    targetFoldProgress = 0.0F
+                }
+            }
+        }
     }
 
     override fun getAllParts(): List<UrCirclePart> = cachedAllParts
     override fun getPartsBoundingBox(): AABB {
+        val outerR = ringOuterRadius()
         val r = when {
-            phase >= 3 -> maxOf(ringOuterRadius() * 2.8, 440.0)
-            phase >= 2 -> maxOf(ringOuterRadius() * 1.8, 240.0)
-            else -> maxOf(ringOuterRadius() + 24.0, 96.0)
+            phase >= 3 -> maxOf(outerR * 2.8, 440.0)
+            phase >= 2 -> maxOf(outerR * 1.8, 240.0)
+            else -> maxOf(outerR + 24.0, 96.0)
         }
         val yUp = when {
-            phase >= 3 -> 400.0
-            phase >= 2 -> 190.0
+            phase >= 3 -> maxOf(outerR * 2.8, 400.0)
+            phase >= 2 -> maxOf(outerR * 1.6, 190.0)
             else -> r
         }
         val yDown = when {
-            phase >= 3 -> 240.0
-            phase >= 2 -> 160.0
+            phase >= 3 -> maxOf(outerR * 1.6, 260.0)
+            phase >= 2 -> maxOf(outerR * 1.4, 250.0)
             else -> r * 0.85
         }
         val c = position().add(0.0, bbHeight * 0.5, 0.0)
@@ -1793,7 +1918,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         }
         return distance <= maxDist * maxDist
     }
-    override fun shouldRecord(): Boolean = isAlive
+    override fun shouldRecord(): Boolean = isAlive && !isRemoved
 
     override fun addEffect(effectInstance: MobEffectInstance, entity: Entity?): Boolean =
         if (effectInstance.effect == MobEffects.GLOWING) super.addEffect(effectInstance, entity) else false
@@ -1813,21 +1938,27 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     fun hurtPart(part: UrCirclePart, source: DamageSource, amount: Float): Boolean {
         if (!level().isClientSide) {
             if (dormant || circleState == CircleState.DYING || circleState == CircleState.PHASE_TRANSITION) return false
+            if (!isAlive || isDeadOrDying) return false
             if (source.entity === this || isUrCircleAlly(source.entity) || isUrCircleAlly(source.directEntity)) return false
+            if (amount <= 0.0F || isInvulnerableTo(source) || source.`is`(HexDamageTypes.OVERCAST)) return false
 
             val isIndirectSource = source.entity is QuenchAllay ||
                 source.directEntity is QuenchAllay ||
                 source.`is`(DamageTypes.MAGIC) ||
                 source.`is`(DamageTypes.INDIRECT_MAGIC)
-            if (isSiphoning() && isIndirectSource && amount > 0.0F) {
+            if (isSiphoning() && isIndirectSource) {
                 shatterSiphon()
             }
 
-            if (part is SlatePart && part.symbolType != SlateSymbolType.NONE && amount > 0.0F) {
+            if (part is SlatePart && part.symbolType != SlateSymbolType.NONE) {
                 if (source.`is`(DamageTypes.FREEZE)) {
                     part.slowdownTicks = 80
                     if (!part.tamperable) {
-                        unlockSlateTamperable(part, part.posNow, Vec3.ZERO)
+                        unlockSlateTamperable(part, part.posNow, Vec3.ZERO, detach = true)
+                    } else if (!part.detached) {
+                        part.detached = true
+                        part.detachedPos = part.posNow
+                        part.detachedVel = Vec3.ZERO
                     }
                 }
                 val fromPos = source.sourcePosition ?: source.directEntity?.position() ?: source.entity?.position()
@@ -1841,6 +1972,8 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                     part.setDeltaMovement(part.deltaMovement.add(pushDir.scale(pushStrength)))
                 }
             }
+
+            if (isImmuneDamage(source)) return false
 
             if (circleState == CircleState.CHANNELING) {
                 val active = currentSkill
@@ -1884,14 +2017,16 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     override fun hurt(source: DamageSource, amount: Float): Boolean {
         if (!level().isClientSide) {
             if (dormant || circleState == CircleState.DYING || circleState == CircleState.PHASE_TRANSITION) return false
+            if (!isAlive || isDeadOrDying) return false
             val attacker = source.entity
             if (attacker === this || isUrCircleAlly(attacker) || isUrCircleAlly(source.directEntity)) return false
+            if (amount <= 0.0F || isInvulnerableTo(source)) return false
+            if (source.`is`(HexDamageTypes.OVERCAST)) return false
+            if (isImmuneDamage(source)) return false
             if (attacker is LivingEntity && attacker !== this && attacker.isAlive) {
                 target = attacker
                 addToHated(attacker)
             }
-            if (source.`is`(HexDamageTypes.OVERCAST)) return false
-            if (isImmuneDamage(source)) return false
         }
         var dmg = if (isFireDamage(source)) amount * FIRE_DAMAGE_MULTIPLIER else amount
         if (circleState == CircleState.SHORT_CIRCUIT) {
@@ -1909,12 +2044,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
                 dpsWindowStart = now
                 dpsWindow = 0.0F
             }
-            val room = DPS_CAP_PER_WINDOW - dpsWindow
+            val room = (DPS_CAP_PER_WINDOW - dpsWindow).coerceAtLeast(0.0F)
             val allowed = dmg.coerceAtMost(room)
             if (allowed <= 0.0F) return false
-            dpsWindow += allowed
             dmg = allowed
         }
+        val hpBefore = health
         internalHealthWrite = true
         return try {
             val active = when (circleState) {
@@ -1927,8 +2062,14 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
             } else {
                 super.hurt(source, dmg)
             }
-            if (result && !level().isClientSide && dmg > 0.0F) {
-                checkPhaseThresholds()
+            if (result && !level().isClientSide) {
+                val actualDealt = (hpBefore - health).coerceAtLeast(0.0F)
+                if (actualDealt > 0.0F) {
+                    dpsWindow += actualDealt
+                    if (circleState != CircleState.SHORT_CIRCUIT) {
+                        checkPhaseThresholds()
+                    }
+                }
             }
             result
         } finally {
@@ -1964,15 +2105,22 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     fun interruptChannel() {
         when (circleState) {
             CircleState.CHANNELING -> {
+                currentSkill?.onChannelCancel(this)
                 currentSkill = null
                 mediaWave.clear(this)
             }
             CircleState.BEAM -> {
-                beamSkill?.onBeamEnd(this)
+                beamSkill?.let {
+                    it.onBeamEnd(this)
+                    it.onChannelCancel(this)
+                }
                 beamSkill = null
             }
             CircleState.FOLD_GRIND -> {
-                grindSkill?.onGrindEnd(this)
+                grindSkill?.let {
+                    it.onGrindEnd(this)
+                    it.onChannelCancel(this)
+                }
                 grindSkill = null
                 targetFoldProgress = 0.0F
             }
@@ -2181,13 +2329,18 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
     fun addToHated(entity: LivingEntity) {
         if (level().isClientSide) return
         if (entity === this || entity is Enemy || isUrCircleAlly(entity) || !entity.isAlive) return
+        if (entity is Player && (entity.isCreative || entity.isSpectator)) return
         if (entity !in hatedTargets && distanceToSqr(entity) <= HATE_RANGE * HATE_RANGE) {
             hatedTargets.add(entity)
         }
     }
 
     fun currentHated(): List<LivingEntity> =
-        hatedTargets.filter { it.isAlive && !it.isRemoved && it !is Enemy && !isUrCircleAlly(it) && distanceToSqr(it) <= HATE_RANGE * HATE_RANGE }
+        hatedTargets.filter {
+            it.isAlive && !it.isRemoved && it !is Enemy && !isUrCircleAlly(it) &&
+                !(it is Player && (it.isCreative || it.isSpectator)) &&
+                distanceToSqr(it) <= HATE_RANGE * HATE_RANGE
+        }
 
     fun preferredTargets(entities: Collection<LivingEntity>): List<LivingEntity> =
         entities.sortedWith(
@@ -2220,12 +2373,16 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
 
     fun accumulateBacklash(player: ServerPlayer) {
         if (level().isClientSide || !isSiphoning()) return
-        if (tickCount - lastBacklashTick < BACKLASH_TICK_INTERVAL) return
-        lastBacklashTick = tickCount
-        backlash += 1
-        if (backlash >= BACKLASH_THRESHOLD) {
-            backlash = 0
+        val uid = player.uuid
+        val lastTick = lastBacklashTickByPlayer[uid]
+        if (lastTick != null && tickCount - lastTick < BACKLASH_TICK_INTERVAL) return
+        lastBacklashTickByPlayer[uid] = tickCount
+        val count = (backlashByPlayer[uid] ?: 0) + 1
+        if (count >= BACKLASH_THRESHOLD) {
+            backlashByPlayer[uid] = 0
             retaliate(player)
+        } else {
+            backlashByPlayer[uid] = count
         }
     }
 
@@ -2368,6 +2525,12 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         val SIPHONING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.BOOLEAN)
         val SLICE_ACTIVE: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.BOOLEAN)
         val SLICE_Y_OFFSET: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val SLICE_OX: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val SLICE_OY: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val SLICE_OZ: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val SLICE_NX: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val SLICE_NY: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
+        val SLICE_NZ: EntityDataAccessor<Float> = SynchedEntityData.defineId(UrCircleEntity::class.java, EntityDataSerializers.FLOAT)
 
         const val CONTACT_DAMAGE = 6.0F
         const val CONTACT_COOLDOWN = 20
@@ -2391,7 +2554,7 @@ class UrCircleEntity(entityType: EntityType<out Mob>, level: Level) : Mob(entity
         const val IDLE_REGEN = 1.0F
         const val SERVANT_SUMMON_INTERVAL = 40
 
-        const val BACKLASH_RANGE = 48.0
+        const val BACKLASH_RANGE = 88.0
         const val BACKLASH_THRESHOLD = 2
         const val BACKLASH_TICK_INTERVAL = 2
         const val SIPHON_INTERVAL = 260
