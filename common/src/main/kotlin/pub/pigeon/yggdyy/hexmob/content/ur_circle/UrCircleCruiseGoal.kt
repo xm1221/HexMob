@@ -40,6 +40,17 @@ class UrCircleCruiseGoal(private val circle: UrCircleEntity) : Goal() {
     }
 
     private fun cruiseAroundTarget(target: LivingEntity, origin: Vec3): Vec3 {
+        // 玩家一旦登上大环甲板，大环保持稳定悬停与缓步自转，不再向高空狂飙将玩家甩穿地板
+        if (UrCircleCarryAlong.isEntityOnRing(circle, target)) {
+            val home = circle.homePos
+            val stableY = if (home != null) {
+                origin.y.coerceIn(home.y + 36.0, home.y + 64.0)
+            } else {
+                origin.y
+            }
+            val driftT = circle.tickCount * 0.015
+            return Vec3(origin.x + sin(driftT) * 0.8, stableY, origin.z + kotlin.math.cos(driftT) * 0.8)
+        }
         val t = circle.tickCount * 0.02
         val tc = target.position().add(0.0, target.bbHeight / 2.0, 0.0)
         var dx = origin.x - tc.x
@@ -86,7 +97,7 @@ class UrCircleCruiseGoal(private val circle: UrCircleEntity) : Goal() {
         const val PREFERRED_RANGE_PHASE2 = 34.0
         const val APPROACH_RANGE_PHASE2 = 48.0
         const val BACK_OFF_RANGE_PHASE2 = 18.0
-        const val HOVER_HEIGHT_PHASE2 = 66.0
-        const val FLY_CEILING_PHASE2 = 120.0
+        const val HOVER_HEIGHT_PHASE2 = 44.0
+        const val FLY_CEILING_PHASE2 = 96.0
     }
 }

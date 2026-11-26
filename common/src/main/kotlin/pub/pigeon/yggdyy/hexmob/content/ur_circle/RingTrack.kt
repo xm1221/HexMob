@@ -149,8 +149,8 @@ object RingTrackFactory {
                 it.globalIndex = nextGlobal++
             }
         }
-        val eclipticDecks = (0 until 16).map {
-            RingPlatformPart(circle, baseWidth = 2.0F, baseHeight = 0.9F).also {
+        val eclipticDecks = (0 until 48).map {
+            RingPlatformPart(circle, baseWidth = 3.2F, baseHeight = 1.3F).also {
                 it.ringIndex = 1
                 it.globalIndex = nextGlobal++
             }
@@ -178,8 +178,8 @@ object RingTrackFactory {
                 it.globalIndex = nextGlobal++
             }
         }
-        val outerDecks = (0 until 36).map {
-            RingPlatformPart(circle, baseWidth = 3.4F, baseHeight = 1.35F).also {
+        val outerDecks = (0 until 96).map {
+            RingPlatformPart(circle, baseWidth = 4.2F, baseHeight = 1.6F).also {
                 it.ringIndex = 2
                 it.globalIndex = nextGlobal++
             }
@@ -188,10 +188,10 @@ object RingTrackFactory {
             kind = RingKind.OUTER_SLATE,
             ringIndex = 2,
             baseRadius = 21.5,
-            baseTiltDeg = 4F,
+            baseTiltDeg = 2.0F,
             tiltAzimuthDeg = 20F,
             spinDir = 1F,
-            spinSpeedMul = 0.14F,
+            spinSpeedMul = 0.07F,
             partScale = 3.6F,
             unlockPhase = 2,
             parts = outerParts,
@@ -230,12 +230,6 @@ object RingTrackFactory {
                 it.globalIndex = nextGlobal++
             }
         }
-        val zenithDecks = (0 until 24).map {
-            RingPlatformPart(circle, baseWidth = 2.4F, baseHeight = 1.0F).also {
-                it.ringIndex = 4
-                it.globalIndex = nextGlobal++
-            }
-        }
         val zenithTrack = RingTrack(
             kind = RingKind.ZENITH_SLATE,
             ringIndex = 4,
@@ -247,7 +241,7 @@ object RingTrackFactory {
             partScale = 3.0F,
             unlockPhase = 3,
             parts = zenithParts,
-            deckParts = zenithDecks,
+            deckParts = emptyList(),
             faceTangent = false,
             haloWidth = 6.5F,
         )

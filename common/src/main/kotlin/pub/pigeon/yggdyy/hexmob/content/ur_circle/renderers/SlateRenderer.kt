@@ -133,7 +133,7 @@ class SlateRenderer(id: ResourceLocation) : PartRenderer(id) {
         val prefixes = PREFIX_CACHE.getOrPut(pattern) {
             Array(angles.size + 1) { count ->
                 if (count >= angles.size) pattern
-                else HexPattern(pattern.startDir, angles.subList(0, count).toList())
+                else HexPattern(pattern.startDir, angles.subList(0, count).toMutableList())
             }
         }
         return prefixes[strokeCount.coerceIn(0, prefixes.lastIndex)]

@@ -65,8 +65,8 @@ class UrCircleTargetGoal(private val circle: UrCircleEntity) : TargetGoal(circle
 
     companion object {
         /** 索敌扫描范围（格）：每 10 tick 扫此半径内 wise 生物。 */
-        const val SCAN_RANGE = 80.0
-        /** 跟随范围（格）：超过后放弃当前目标（覆盖二/三阶段 74.2 格作战距离，避免脱锁抖动）。 */
-        const val FOLLOW_RANGE = 96.0
+        const val SCAN_RANGE = 160.0
+        /** 跟随范围（格）：覆盖三阶段 142+ 格天穹外环登环作战距离，避免脱锁。 */
+        const val FOLLOW_RANGE = 192.0
     }
 }

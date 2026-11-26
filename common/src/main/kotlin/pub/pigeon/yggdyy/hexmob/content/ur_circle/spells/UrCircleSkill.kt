@@ -18,6 +18,9 @@ abstract class UrCircleSkill(val name: String, val channelTicks: Int) {
 
     open val weight: Int = 1
 
+    /** 同技能最小复放间隔（tick）。 */
+    open val perSkillCooldownTicks: Int = 140
+
     /** 最低解锁阶段（1=一阶段可用，2=二阶段巨环展开后解锁）。 */
     open val minPhase: Int = 1
 

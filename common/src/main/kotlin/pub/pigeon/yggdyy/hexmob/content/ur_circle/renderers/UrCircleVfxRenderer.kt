@@ -26,6 +26,7 @@ import pub.pigeon.yggdyy.hexmob.HexMob
 import pub.pigeon.yggdyy.hexmob.client.UrCircleHudTracker
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.CircleState
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.spells.RingSpinSkill
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
 import pub.pigeon.yggdyy.hexmob.util.rotateDA
 import kotlin.math.abs
@@ -50,9 +51,9 @@ object UrCircleVfxRenderer {
     private const val PILLAR_CACHE_INTERVAL = 4
     private const val DEBRIS_CACHE_INTERVAL = 5
 
-    private const val DOME_PHI_BANDS = 7
+    private const val DOME_PHI_BANDS = 14
     private const val DOME_THETA_SEGS = 36
-    private val DOME_MAX_PHI_RAD = Math.toRadians(106.0)
+    private val DOME_MAX_PHI_RAD = Math.toRadians(108.0)
     private val DOME_COS_THETA = DoubleArray(DOME_THETA_SEGS + 1) { idx ->
         cos((idx.toDouble() / DOME_THETA_SEGS) * Math.PI * 2.0)
     }
@@ -65,11 +66,16 @@ object UrCircleVfxRenderer {
     private val DOME_COS_PHI = DoubleArray(DOME_PHI_BANDS + 1) { band ->
         cos(DOME_MAX_PHI_RAD * band / DOME_PHI_BANDS)
     }
-    private val DOME_MID_SIN_PHI = DoubleArray(DOME_PHI_BANDS) { band ->
-        sin(DOME_MAX_PHI_RAD * (band + 0.5) / DOME_PHI_BANDS)
-    }
-    private val DOME_MID_COS_PHI = DoubleArray(DOME_PHI_BANDS) { band ->
-        cos(DOME_MAX_PHI_RAD * (band + 0.5) / DOME_PHI_BANDS)
+    private val DOME_BAND_ALPHA = FloatArray(DOME_PHI_BANDS + 1) { band ->
+        val phiDeg = 108.0 * band / DOME_PHI_BANDS
+        when {
+            phiDeg <= 66.0 -> 1.0F
+            phiDeg >= 108.0 -> 0.0F
+            else -> {
+                val u = ((phiDeg - 66.0) / 42.0).coerceIn(0.0, 1.0)
+                (1.0 - u * u * (3.0 - 2.0 * u)).toFloat()
+            }
+        }
     }
 
     private object UrCircleRenderTypes : RenderType(
@@ -82,22 +88,20 @@ object UrCircleVfxRenderer {
         Runnable {},
         Runnable {},
     ) {
-        fun noDepthTranslucent(name: String, texture: ResourceLocation): RenderType {
+        fun noFogSkyTranslucent(name: String, texture: ResourceLocation): RenderType {
             val state = CompositeState.builder()
-                .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                .setShaderState(POSITION_COLOR_TEX_SHADER)
                 .setTextureState(TextureStateShard(texture, false, false))
                 .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                 .setCullState(NO_CULL)
-                .setLightmapState(LIGHTMAP)
-                .setOverlayState(OVERLAY)
                 .setWriteMaskState(COLOR_WRITE)
                 .createCompositeState(false)
-            return create(name, DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 256, false, true, state)
+            return create(name, DefaultVertexFormat.POSITION_COLOR_TEX, VertexFormat.Mode.QUADS, 256, false, true, state)
         }
     }
 
-    private val ECLIPSE_VEIL_RENDER_TYPE = UrCircleRenderTypes.noDepthTranslucent("hexmob_eclipse_veil", ECLIPSE_VEIL_TEX)
-    private val CELESTIAL_FIRMAMENT_RENDER_TYPE = UrCircleRenderTypes.noDepthTranslucent("hexmob_celestial_firmament", CELESTIAL_FIRMAMENT_TEX)
+    private val ECLIPSE_VEIL_RENDER_TYPE = UrCircleRenderTypes.noFogSkyTranslucent("hexmob_eclipse_veil", ECLIPSE_VEIL_TEX)
+    private val CELESTIAL_FIRMAMENT_RENDER_TYPE = UrCircleRenderTypes.noFogSkyTranslucent("hexmob_celestial_firmament", CELESTIAL_FIRMAMENT_TEX)
 
     private class EntityVfxCache {
         var levelId: Int = 0
@@ -299,15 +303,15 @@ object UrCircleVfxRenderer {
             // =========================================================================
             if (hasPhase2 && outerR > 8.0) {
                 val veilBuf = buffer.getBuffer(ECLIPSE_VEIL_RENDER_TYPE)
-                renderEclipseVeilPass(entity, partialTick, localCenter, outerN, outerRad, outerR, outerRot, unit, p2, p3, shortCircuited, veilBuf, m4, m3)
+                renderEclipseVeilPass(entity, partialTick, localCenter, outerN, outerRad, outerR, outerRot, unit, p2, p3, shortCircuited, veilBuf, m4)
             }
 
             // =========================================================================
-            // PASS 3.5: 三阶段“覆压周天”贴图天穹星幕（340~400 格穹顶，仅写颜色不写深度）
+            // PASS 3.5: 三阶段“覆压周天”贴图天穹星幕（340~400 格无雾穹顶，平滑边界消隐）
             // =========================================================================
             if (hasPhase3 && firmamentR > 24.0) {
                 val skyBuf = buffer.getBuffer(CELESTIAL_FIRMAMENT_RENDER_TYPE)
-                renderPhase3CelestialFirmamentPass(entity, partialTick, localCenter, firmamentR, outerRot, p3, shortCircuited, skyBuf, m4, m3)
+                renderPhase3CelestialFirmamentPass(entity, partialTick, ix, iy, iz, localCenter, firmamentR, outerRot, p3, shortCircuited, skyBuf, m4)
             }
 
             // =========================================================================
@@ -412,7 +416,7 @@ object UrCircleVfxRenderer {
                 val radial = outerRad.rotateDA(ang, outerN)
                 val tangent = outerN.cross(radial).let { if (it.lengthSqr() > 1.0E-5) it.normalize() else Vec3(0.0, 0.0, 1.0) }
                 val cragLevel = (i * 11) % 5
-                val yJitter = (cragLevel - 2) * 1.4 * unit
+                val yJitter = (cragLevel - 3.2) * 1.1 * unit
                 val basePos = localCenter.add(radial.scale(outerR + crumble * 16.0 * unit))
                     .add(outerN.scale(yJitter))
                     .add(0.0, -crumble * crumble * 28.0 * unit, 0.0)
@@ -423,7 +427,7 @@ object UrCircleVfxRenderer {
                     else -> obsidianModel
                 }
                 val wallLight = if (i % 3 == 2) LightTexture.FULL_BRIGHT else packedLight
-                val wallH = (8.0F + cragLevel * 2.1F) * unit * surv
+                val wallH = (6.8F + cragLevel * 1.4F) * unit * surv
                 renderOrientedModel(
                     blockRenderer, cutoutBuf, poseStack, wallModel,
                     basePos, forward = tangent, up = outerN,
@@ -820,7 +824,6 @@ object UrCircleVfxRenderer {
         shortCircuited: Boolean,
         veilBuf: VertexConsumer,
         m4: Matrix4f,
-        m3: Matrix3f,
     ) {
         val dyingMul = if (entity.circleState == CircleState.DYING) {
             (1.0F - (entity.stateTicks + partialTick) / 75.0F).coerceIn(0.0F, 1.0F)
@@ -837,28 +840,31 @@ object UrCircleVfxRenderer {
         val veilR = outerR * (1.115 + 0.22 * p3)
 
         drawSingleSideTexturedQuad(
-            veilBuf, m4, m3,
+            veilBuf, m4,
             localCenter.add(outerN.scale(1.65 * unit)),
-            radU.scale(veilR), radV.scale(veilR), outerN,
+            radU.scale(veilR), radV.scale(veilR),
             255, 255, 255, alpha,
             flipWinding = false,
         )
         drawSingleSideTexturedQuad(
-            veilBuf, m4, m3,
+            veilBuf, m4,
             localCenter.add(outerN.scale(0.85 * unit)),
-            radU.scale(veilR), radV.scale(veilR), outerN.scale(-1.0),
+            radU.scale(veilR), radV.scale(veilR),
             255, 255, 255, alpha,
             flipWinding = true,
         )
     }
 
     /**
-     * 三阶段“覆压周天”贴图天穹穹顶（半径 340~400+ 格，天顶弧线垂落至地平线下 16°）：
-     * 即使玩家站在 200+ 格开外，依然身处天穹大阵之下，仰望与平视方向彻底隔绝原版天空与日月。
+     * 三阶段“覆压周天”贴图天穹穹顶（单层 NO_CULL 无雾穹顶 + 纬圈渐隐 + 相机越界平滑过渡）：
+     * 消除暗紫天空雾吞没贴图及跨越 340~400 格边界时的硬切换感。
      */
     private fun renderPhase3CelestialFirmamentPass(
         entity: UrCircleEntity,
         partialTick: Float,
+        ix: Double,
+        iy: Double,
+        iz: Double,
         localCenter: Vec3,
         firmamentR: Double,
         outerRot: Float,
@@ -866,40 +872,49 @@ object UrCircleVfxRenderer {
         shortCircuited: Boolean,
         skyBuf: VertexConsumer,
         m4: Matrix4f,
-        m3: Matrix3f,
     ) {
         val dyingMul = if (entity.circleState == CircleState.DYING) {
             (1.0F - (entity.stateTicks + partialTick) / 75.0F).coerceIn(0.0F, 1.0F)
         } else {
             1.0F
         }
-        val baseAlpha = if (shortCircuited) 95F else 238F
-        val alpha = (baseAlpha * p3 * dyingMul).toInt().coerceIn(0, 245)
-        if (alpha <= 4) return
-
+        val camPos = Minecraft.getInstance().gameRenderer.mainCamera.position
         val cx = localCenter.x
         val cy = localCenter.y + 12.0
         val cz = localCenter.z
+        val camDist = camPos.distanceTo(Vec3(ix + cx, iy + cy, iz + cz))
+        val ratio = camDist / firmamentR.coerceAtLeast(1.0)
+        val camFade = when {
+            ratio <= 0.82 -> 1.0F
+            ratio < 1.15 -> {
+                val u = ((ratio - 0.82) / 0.33).coerceIn(0.0, 1.0)
+                val s = u * u * (3.0 - 2.0 * u)
+                (1.0 + (0.38 - 1.0) * s).toFloat()
+            }
+            ratio < 1.55 -> {
+                val u = ((ratio - 1.15) / 0.40).coerceIn(0.0, 1.0)
+                val s = u * u * (3.0 - 2.0 * u)
+                (0.38 * (1.0 - s)).toFloat()
+            }
+            else -> 0.0F
+        }
+        val baseAlpha = if (shortCircuited) 95F else 238F
+        val alpha = (baseAlpha * p3 * dyingMul * camFade).toInt().coerceIn(0, 245)
+        if (alpha <= 4) return
+
         val rotRad = Math.toRadians((outerRot * 0.25F).toDouble())
 
-        // 内层穹顶面（法线朝内/下方，站于穹顶内或 200+ 格地面仰望时正面渲染）
+        // 单层 NO_CULL 穹顶面（无双层壳体跨界突变，内外观测皆流畅平滑）
         drawTexturedCelestialDome(
-            skyBuf, m4, m3, cx, cy, cz, firmamentR,
+            skyBuf, m4, cx, cy, cz, firmamentR,
             rotRad, 255, 255, 255, alpha,
             inwardFacing = true,
-        )
-        // 外层错开 1.8 格的外壳面（远超 360 格从穹顶外部回望时亦不消隐，零 Z-Fight）
-        drawTexturedCelestialDome(
-            skyBuf, m4, m3, cx, cy, cz, firmamentR + 1.8,
-            rotRad, 235, 225, 255, (alpha * 0.85F).toInt().coerceIn(0, 240),
-            inwardFacing = false,
         )
     }
 
     private fun drawTexturedCelestialDome(
         consumer: VertexConsumer,
         m4: Matrix4f,
-        m3: Matrix3f,
         cx: Double,
         cy: Double,
         cz: Double,
@@ -913,9 +928,12 @@ object UrCircleVfxRenderer {
     ) {
         val cosRot = cos(rotRad)
         val sinRot = sin(rotRad)
-        val normalSign = if (inwardFacing) -1.0F else 1.0F
 
         for (band in 0 until DOME_PHI_BANDS) {
+            val a0 = (alpha * DOME_BAND_ALPHA[band]).toInt().coerceIn(0, 255)
+            val a1 = (alpha * DOME_BAND_ALPHA[band + 1]).toInt().coerceIn(0, 255)
+            if (a0 <= 2 && a1 <= 2) continue
+
             val sinPhi0 = DOME_SIN_PHI[band]
             val cosPhi0 = DOME_COS_PHI[band]
             val sinPhi1 = DOME_SIN_PHI[band + 1]
@@ -926,8 +944,6 @@ object UrCircleVfxRenderer {
             val y1 = (cy + cosPhi1 * radius).toFloat()
             val rUv0 = (0.495 * band / DOME_PHI_BANDS).toFloat()
             val rUv1 = (0.495 * (band + 1) / DOME_PHI_BANDS).toFloat()
-            val midSinPhi = DOME_MID_SIN_PHI[band]
-            val ny = DOME_MID_COS_PHI[band].toFloat() * normalSign
 
             for (seg in 0 until DOME_THETA_SEGS) {
                 val ct0 = DOME_COS_THETA[seg]
@@ -958,29 +974,16 @@ object UrCircleVfxRenderer {
                 val u01 = 0.5F + rUv1 * cosUv0
                 val v01 = 0.5F + rUv1 * sinUv0
 
-                val midCosTheta = (ct0 + ct1) * 0.5
-                val midSinTheta = (st0 + st1) * 0.5
-                val nx = (midCosTheta * midSinPhi).toFloat() * normalSign
-                val nz = (midSinTheta * midSinPhi).toFloat() * normalSign
-
                 if (!inwardFacing) {
-                    consumer.vertex(m4, p00x, y0, p00z).color(red, green, blue, alpha).uv(u00, v00)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-                    consumer.vertex(m4, p10x, y0, p10z).color(red, green, blue, alpha).uv(u10, v10)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-                    consumer.vertex(m4, p11x, y1, p11z).color(red, green, blue, alpha).uv(u11, v11)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-                    consumer.vertex(m4, p01x, y1, p01z).color(red, green, blue, alpha).uv(u01, v01)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
+                    consumer.vertex(m4, p00x, y0, p00z).color(red, green, blue, a0).uv(u00, v00).endVertex()
+                    consumer.vertex(m4, p10x, y0, p10z).color(red, green, blue, a0).uv(u10, v10).endVertex()
+                    consumer.vertex(m4, p11x, y1, p11z).color(red, green, blue, a1).uv(u11, v11).endVertex()
+                    consumer.vertex(m4, p01x, y1, p01z).color(red, green, blue, a1).uv(u01, v01).endVertex()
                 } else {
-                    consumer.vertex(m4, p01x, y1, p01z).color(red, green, blue, alpha).uv(u01, v01)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-                    consumer.vertex(m4, p11x, y1, p11z).color(red, green, blue, alpha).uv(u11, v11)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-                    consumer.vertex(m4, p10x, y0, p10z).color(red, green, blue, alpha).uv(u10, v10)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-                    consumer.vertex(m4, p00x, y0, p00z).color(red, green, blue, alpha).uv(u00, v00)
-                        .overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
+                    consumer.vertex(m4, p01x, y1, p01z).color(red, green, blue, a1).uv(u01, v01).endVertex()
+                    consumer.vertex(m4, p11x, y1, p11z).color(red, green, blue, a1).uv(u11, v11).endVertex()
+                    consumer.vertex(m4, p10x, y0, p10z).color(red, green, blue, a0).uv(u10, v10).endVertex()
+                    consumer.vertex(m4, p00x, y0, p00z).color(red, green, blue, a0).uv(u00, v00).endVertex()
                 }
             }
         }
@@ -1091,6 +1094,20 @@ object UrCircleVfxRenderer {
             val midR = midTrack.effectiveRadius(scale, df, p2, p3)
             drawStrutRing(lineBuf, m4, localCenter.add(midN.scale(0.65 * unit)), midRad, midN, midR * 1.04, 32, 0.16 * unit, 185, 105, 245, 105)
             drawStrutRing(lineBuf, m4, localCenter.subtract(midN.scale(0.65 * unit)), midRad, midN, midR * 0.96, 32, 0.14 * unit, 245, 200, 115, 95)
+        }
+
+        // 2.2 环刃风暴（RingSpinSkill）前摇 1 秒：外环与黄道环高频闪烁橙红警示环圈
+        if (entity.entityData.get(UrCircleEntity.RING_SPINNING) && entity.stateTicks < RingSpinSkill.WARNING_TICKS && hasPhase2) {
+            val pulse = ((0.5 + 0.5 * sin((t * 1.1F).toDouble())) * 105.0 + 130.0).toInt().coerceIn(0, 245)
+            if (outerR > 8.0) {
+                drawStrutRing(lineBuf, m4, localCenter.add(outerN.scale(0.8 * unit)), outerRad, outerN, outerR * 1.08, 48, 0.34 * unit, 255, 95, 45, pulse)
+            }
+            if (midTrack != null && midTrack.isVisible(entity.phase, p2, p3)) {
+                val midN = midTrack.effectiveNormal(fp, df)
+                val midRad = midTrack.radialAxis(midN)
+                val midR = midTrack.effectiveRadius(scale, df, p2, p3)
+                drawStrutRing(lineBuf, m4, localCenter.add(midN.scale(0.5 * unit)), midRad, midN, midR * 1.06, 36, 0.28 * unit, 255, 95, 45, pulse)
+            }
         }
 
         // 2.5 M1 象征石板核心连线与“可篡改态”青色闪烁虚线 + 石板青光边框
@@ -1343,11 +1360,9 @@ object UrCircleVfxRenderer {
     private fun drawSingleSideTexturedQuad(
         consumer: VertexConsumer,
         m4: Matrix4f,
-        m3: Matrix3f,
         center: Vec3,
         uAxis: Vec3,
         vAxis: Vec3,
-        normal: Vec3,
         r: Int,
         g: Int,
         b: Int,
@@ -1358,18 +1373,17 @@ object UrCircleVfxRenderer {
         val p10 = center.add(uAxis).subtract(vAxis)
         val p11 = center.add(uAxis).add(vAxis)
         val p01 = center.subtract(uAxis).add(vAxis)
-        val nx = normal.x.toFloat(); val ny = normal.y.toFloat(); val nz = normal.z.toFloat()
 
         if (!flipWinding) {
-            consumer.vertex(m4, p00.x.toFloat(), p00.y.toFloat(), p00.z.toFloat()).color(r, g, b, alpha).uv(0F, 0F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-            consumer.vertex(m4, p10.x.toFloat(), p10.y.toFloat(), p10.z.toFloat()).color(r, g, b, alpha).uv(1F, 0F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-            consumer.vertex(m4, p11.x.toFloat(), p11.y.toFloat(), p11.z.toFloat()).color(r, g, b, alpha).uv(1F, 1F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-            consumer.vertex(m4, p01.x.toFloat(), p01.y.toFloat(), p01.z.toFloat()).color(r, g, b, alpha).uv(0F, 1F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
+            consumer.vertex(m4, p00.x.toFloat(), p00.y.toFloat(), p00.z.toFloat()).color(r, g, b, alpha).uv(0F, 0F).endVertex()
+            consumer.vertex(m4, p10.x.toFloat(), p10.y.toFloat(), p10.z.toFloat()).color(r, g, b, alpha).uv(1F, 0F).endVertex()
+            consumer.vertex(m4, p11.x.toFloat(), p11.y.toFloat(), p11.z.toFloat()).color(r, g, b, alpha).uv(1F, 1F).endVertex()
+            consumer.vertex(m4, p01.x.toFloat(), p01.y.toFloat(), p01.z.toFloat()).color(r, g, b, alpha).uv(0F, 1F).endVertex()
         } else {
-            consumer.vertex(m4, p01.x.toFloat(), p01.y.toFloat(), p01.z.toFloat()).color(r, g, b, alpha).uv(0F, 1F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-            consumer.vertex(m4, p11.x.toFloat(), p11.y.toFloat(), p11.z.toFloat()).color(r, g, b, alpha).uv(1F, 1F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-            consumer.vertex(m4, p10.x.toFloat(), p10.y.toFloat(), p10.z.toFloat()).color(r, g, b, alpha).uv(1F, 0F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
-            consumer.vertex(m4, p00.x.toFloat(), p00.y.toFloat(), p00.z.toFloat()).color(r, g, b, alpha).uv(0F, 0F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT).normal(m3, nx, ny, nz).endVertex()
+            consumer.vertex(m4, p01.x.toFloat(), p01.y.toFloat(), p01.z.toFloat()).color(r, g, b, alpha).uv(0F, 1F).endVertex()
+            consumer.vertex(m4, p11.x.toFloat(), p11.y.toFloat(), p11.z.toFloat()).color(r, g, b, alpha).uv(1F, 1F).endVertex()
+            consumer.vertex(m4, p10.x.toFloat(), p10.y.toFloat(), p10.z.toFloat()).color(r, g, b, alpha).uv(1F, 0F).endVertex()
+            consumer.vertex(m4, p00.x.toFloat(), p00.y.toFloat(), p00.z.toFloat()).color(r, g, b, alpha).uv(0F, 0F).endVertex()
         }
     }
 

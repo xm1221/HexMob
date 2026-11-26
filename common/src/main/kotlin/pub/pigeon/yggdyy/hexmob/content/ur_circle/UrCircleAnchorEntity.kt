@@ -15,15 +15,19 @@ import net.minecraft.world.entity.EntityType
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
+import pub.pigeon.yggdyy.hexmob.util.rotateDA
 
 /**
  * 接地促动石锚点：
- * 大环吟唱时在战场低空降下的导通节点，可被玩家近战、弓箭或任意法术直接击破；
+ * 大环吟唱时在战场低空或外环甲板上降下的导通节点，可被玩家近战、弓箭或任意法术直接击破；
  * 击碎锚点即可触发高空大环法术环断路坠落（SHORT_CIRCUIT）。
  */
 class UrCircleAnchorEntity(entityType: EntityType<out Entity>, level: Level) : Entity(entityType, level) {
     var owner: UrCircleEntity? = null
     var lifeTicks: Int = MAX_LIFETIME
+    var mountedRingIndex: Int = -1
+    var mountedAngleOffsetDeg: Float = 0.0F
+    var mountedYOffset: Double = 2.8
 
     init {
         noPhysics = true
@@ -109,6 +113,19 @@ class UrCircleAnchorEntity(entityType: EntityType<out Entity>, level: Level) : E
         }
         val origin = o.beamOrigin()
         setTetherTarget(origin)
+        if (mountedRingIndex >= 0) {
+            val track = o.rings.getOrNull(mountedRingIndex)
+            if (track != null && track.isVisible(o.phase, o.phase2Reveal, o.phase3Reveal)) {
+                val effN = track.effectiveNormal(o.foldProgress, o.dormantFold)
+                val radAxis = track.radialAxis(effN)
+                val rLen = track.effectiveRadius(o.totalScale(), o.dormantFold, o.phase2Reveal, o.phase3Reveal)
+                val worldPos = origin.add(
+                    radAxis.rotateDA(o.ringRotation(mountedRingIndex) + mountedAngleOffsetDeg, effN).scale(rLen)
+                ).add(0.0, mountedYOffset, 0.0)
+                setPos(worldPos.x, worldPos.y, worldPos.z)
+                setDeltaMovement(Vec3.ZERO)
+            }
+        }
         if (tickCount % 4 == 0) {
             UrCircleHexVfx.spawnConjure(level(), color, x, y + 1.4, z, 0.0, 0.14, 0.0)
         }
@@ -119,8 +136,23 @@ class UrCircleAnchorEntity(entityType: EntityType<out Entity>, level: Level) : E
     }
 
     override fun shouldBeSaved(): Boolean = false
-    override fun addAdditionalSaveData(compound: CompoundTag) {}
-    override fun readAdditionalSaveData(compound: CompoundTag) {}
+    override fun addAdditionalSaveData(compound: CompoundTag) {
+        compound.putInt("hexmob:MountedRing", mountedRingIndex)
+        compound.putFloat("hexmob:MountedAngleDeg", mountedAngleOffsetDeg)
+        compound.putDouble("hexmob:MountedYOffset", mountedYOffset)
+    }
+
+    override fun readAdditionalSaveData(compound: CompoundTag) {
+        if (compound.contains("hexmob:MountedRing")) {
+            mountedRingIndex = compound.getInt("hexmob:MountedRing")
+        }
+        if (compound.contains("hexmob:MountedAngleDeg")) {
+            mountedAngleOffsetDeg = compound.getFloat("hexmob:MountedAngleDeg")
+        }
+        if (compound.contains("hexmob:MountedYOffset")) {
+            mountedYOffset = compound.getDouble("hexmob:MountedYOffset")
+        }
+    }
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> = ClientboundAddEntityPacket(this)
 
     companion object {

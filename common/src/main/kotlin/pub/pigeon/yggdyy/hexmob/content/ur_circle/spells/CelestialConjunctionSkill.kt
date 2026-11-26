@@ -19,6 +19,7 @@ import pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities.SlateSymbolType
  */
 class CelestialConjunctionSkill : UrCircleSkill("celestial_conjunction", CHANNEL_TICKS) {
     override val weight: Int = 6
+    override val perSkillCooldownTicks: Int = 260
     override val minPhase: Int = 3
     override val waveColor: Int = UrCircleHexVfx.WAVE_GOLD
     override val channelInterruptible: Boolean = false

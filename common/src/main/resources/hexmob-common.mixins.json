@@ -18,6 +18,7 @@
     "MultiNoiseBiomeSourceMixin",
     "NoiseBasedChunkGeneratorMixin",
     "OverworldBiomeBuilderMixin",
+    "ServerGamePacketListenerImplMixin",
     "ServerLevelMixin",
     "StrongholdPieces$LibraryAccessor",
     "StrongholdPiecesMixin"

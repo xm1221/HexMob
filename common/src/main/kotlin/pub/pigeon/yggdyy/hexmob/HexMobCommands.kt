@@ -25,6 +25,7 @@ object HexMobCommands {
         "plane_slice",
         "summon_servants",
         "celestial_conjunction",
+        "ring_spin",
     )
 
     fun init() {

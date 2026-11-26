@@ -1,5 +1,7 @@
 package pub.pigeon.yggdyy.hexmob.content.ur_circle.subentities
 
+import at.petrak.hexcasting.api.casting.iota.Iota
+import at.petrak.hexcasting.api.casting.iota.PatternIota
 import at.petrak.hexcasting.api.casting.math.HexDir
 import at.petrak.hexcasting.api.casting.math.HexPattern
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
@@ -25,5 +27,31 @@ enum class SlateSymbolType(
 
     companion object {
         fun byId(id: Int): SlateSymbolType = entries.getOrElse(id.coerceIn(0, entries.lastIndex)) { NONE }
+
+        /** 将角度序列左右镜像（q<->e, a<->d, w/s 保持），生成大环石板的对应解咒反向图案签名。 */
+        fun mirrorSignature(sig: String): String = buildString(sig.length) {
+            for (ch in sig) {
+                append(
+                    when (ch) {
+                        'q' -> 'e'
+                        'e' -> 'q'
+                        'a' -> 'd'
+                        'd' -> 'a'
+                        else -> ch
+                    }
+                )
+            }
+        }
+
+        /** 校验玩家写入的图案是否为石板原始图案的镜像逆解或逆序镜像逆解。 */
+        fun isCounterSolution(slatePattern: HexPattern, written: Iota): Boolean {
+            if (written !is PatternIota) return false
+            val srcSig = slatePattern.anglesSignature()
+            val writtenSig = written.pattern.anglesSignature()
+            if (srcSig.isEmpty() || writtenSig.isEmpty()) return false
+            val mirrored = mirrorSignature(srcSig)
+            val mirroredRev = mirrorSignature(srcSig.reversed())
+            return writtenSig == mirrored || writtenSig == mirroredRev
+        }
     }
 }

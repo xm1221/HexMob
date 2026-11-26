@@ -8,6 +8,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.monster.Enemy
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleCarryAlong
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleEntity
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.UrCircleHexVfx
 import pub.pigeon.yggdyy.hexmob.content.ur_circle.isUrCircleAlly
@@ -16,20 +17,25 @@ import java.util.UUID
 
 /**
  * 【环刃风暴】Ring Spin——部件膨胀、环半径扩展、转速飙升，
- * 吸引周边实体并以单次包围球查询 + 最近部件距离结算绞杀伤害。
+ * 拥有 1 秒橙红闪环前摇提示，随后吸引周边实体并以最近部件距离结算绞杀伤害。
  */
 class RingSpinSkill : UrCircleSkill("ring_spin", CHANNEL_TICKS) {
 
-    override val weight: Int = 4
+    override val weight: Int = 3
+    override val minPhase: Int = 2
+    override val perSkillCooldownTicks: Int = 220
     override val waveColor: Int = UrCircleHexVfx.WAVE_GOLD
 
     override fun channelHurtInterrupts(circle: UrCircleEntity): Boolean = false
     override fun channelPulseVolume(circle: UrCircleEntity): Float = 2.2F
 
     override fun canUse(circle: UrCircleEntity): Boolean {
-        if (circle.level().isClientSide) return false
+        if (circle.level().isClientSide || circle.phase < 2) return false
         val t = circle.target
-        return t != null && t.isAlive && circle.health / circle.maxHealth > 0.5
+        if (t == null || !t.isAlive) return false
+        val maxRange = circle.ringOuterRadius() + 28.0
+        return UrCircleCarryAlong.isEntityOnRing(circle, t) ||
+            t.position().distanceToSqr(circle.beamOrigin()) <= maxRange * maxRange
     }
 
     override fun channelParticlesPerPulse(circle: UrCircleEntity): Int = 20
@@ -52,6 +58,22 @@ class RingSpinSkill : UrCircleSkill("ring_spin", CHANNEL_TICKS) {
         val origin = circle.beamOrigin()
         val hull = circle.getPartsBoundingBox()
         val parts = circle.getAllParts()
+        if (circle.stateTicks < WARNING_TICKS) {
+            if (circle.stateTicks == 1 || circle.stateTicks == 10) {
+                val pitch = if (circle.stateTicks == 1) 0.75F else 1.15F
+                UrCircleHexVfx.playRingSound(level, origin, circle.ringOuterRadius(), HexSounds.ABACUS_SHAKE, 2.4F, pitch)
+            }
+            if (circle.stateTicks % 2 == 0) {
+                for (part in parts) {
+                    if (!part.active || !part.walkPlatform || part.posNow == Vec3.ZERO) continue
+                    if (part.ringIndex != 1 && part.ringIndex != 2) continue
+                    val p = part.posNow
+                    UrCircleHexVfx.spawnConjure(level, 0xFF5A2A, p.x, p.y + 0.85, p.z, 0.0, 0.16, 0.0)
+                }
+            }
+            return
+        }
+
         for (victim in level.getEntitiesOfClass(LivingEntity::class.java, hull)) {
             if (victim === circle || victim is Enemy || isUrCircleAlly(victim) || hitCooldowns.containsKey(victim.uuid)) continue
             val vc = victim.position().add(0.0, victim.bbHeight / 2.0, 0.0)
@@ -105,10 +127,11 @@ class RingSpinSkill : UrCircleSkill("ring_spin", CHANNEL_TICKS) {
     override fun channelDamageMultiplier(circle: UrCircleEntity): Float = 0.9F
 
     companion object {
+        const val WARNING_TICKS = 20
         const val CHANNEL_TICKS = 80
         const val SPIN_DAMAGE = 14.0F
         const val HIT_COOLDOWN = 2
-        const val KNOCKBACK = 5
+        const val KNOCKBACK = 2.2F
         const val MAX_PULL_RADIUS = 48.0
         const val PULL_ACCEL = 0.08
         const val PULL_DAMP = 0.95

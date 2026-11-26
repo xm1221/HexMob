@@ -2,8 +2,6 @@ package pub.pigeon.yggdyy.hexmob.content.ur_circle.spells
 
 import at.petrak.hexcasting.api.casting.mishaps.Mishap
 import at.petrak.hexcasting.api.casting.mishaps.MishapDivideByZero
-import at.petrak.hexcasting.api.casting.mishaps.MishapEntityTooFarAway
-import at.petrak.hexcasting.api.casting.mishaps.MishapImmuneEntity
 import at.petrak.hexcasting.api.casting.mishaps.MishapNotEnoughMedia
 import at.petrak.hexcasting.api.casting.mishaps.MishapInvalidPattern
 import net.minecraft.network.chat.Component
@@ -41,18 +39,15 @@ object UrCircleStatusTable {
         UrCircleDebuff(MobEffects.GLOWING, 300, 0, 1),            // 发光（标记猎物）
     )
 
-    // ---- 原版 Hex 事故池（丢事故）：每条工厂返回新事故实例 ----
+    // ---- 原版 Hex 事故池（移除摔法杖系惩罚，保留媒质耗损/运算错误提示） ----
     val mishaps: List<(UrCircleEntity) -> Mishap> = listOf(
-        // 媒质不足：抽走施法者身上 500 媒质，红色"你不能过度施法"——最贴反向过度施法
+        // 媒质不足：抽走施法者身上 500 媒质，红色"你不能过度施法"
         { MishapNotEnoughMedia(500L) },
-        // 实体免疫：把施法者手持物甩向大环
-        { circle -> MishapImmuneEntity(circle) },
-        // 目标太远：把施法者手持物甩向大环
-        { circle -> MishapEntityTooFarAway(circle) },
+        // 重度媒质反噬：抽走施法者身上 1000 媒质
+        { MishapNotEnoughMedia(1000L) },
         // 除零：纯红色报错文案
         { MishapDivideByZero(Component.literal("1"), Component.literal("0")) },
-        // 格式错误（占位事故：0.11.3 的 MishapTooManyCloseParens 在 0.11.4 改名 MishapNeedsParens，
-        // 两边版本各缺一个类名 → 用两版都有的 MishapInvalidPattern 无参版代替）：纯红色报错文案
+        // 格式错误：纯红色报错文案
         { MishapInvalidPattern() },
     )
 

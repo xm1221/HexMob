@@ -10,7 +10,7 @@ import kotlin.math.sqrt
  * 追踪距离玩家最近且清醒的大环，驱动二/三阶段天穹暗蚀、云层遮蔽与远景雾效渐变。
  */
 object UrCircleSkyTracker {
-    private const val INNER_RANGE = 260.0
+    private const val INNER_RANGE = 220.0
     private const val OUTER_RANGE = 520.0
 
     @Volatile
@@ -48,7 +48,8 @@ object UrCircleSkyTracker {
             val distFade = if (dist <= INNER_RANGE) {
                 1.0F
             } else {
-                (1.0 - (dist - INNER_RANGE) / (OUTER_RANGE - INNER_RANGE)).toFloat().coerceIn(0.0F, 1.0F)
+                val raw = ((OUTER_RANGE - dist) / (OUTER_RANGE - INNER_RANGE)).coerceIn(0.0, 1.0)
+                (raw * raw * (3.0 - 2.0 * raw)).toFloat()
             }
 
             val basePresence = when {
@@ -82,13 +83,13 @@ object UrCircleSkyTracker {
         }
 
         domainIntensity = when {
-            domainIntensity < bestTarget -> (domainIntensity + 0.035F).coerceAtMost(bestTarget)
-            domainIntensity > bestTarget -> (domainIntensity - 0.03F).coerceAtLeast(bestTarget)
+            domainIntensity < bestTarget -> (domainIntensity + 0.025F).coerceAtMost(bestTarget)
+            domainIntensity > bestTarget -> (domainIntensity - 0.025F).coerceAtLeast(bestTarget)
             else -> domainIntensity
         }
         phase3Intensity = when {
-            phase3Intensity < bestPhase3 -> (phase3Intensity + 0.035F).coerceAtMost(bestPhase3)
-            phase3Intensity > bestPhase3 -> (phase3Intensity - 0.03F).coerceAtLeast(bestPhase3)
+            phase3Intensity < bestPhase3 -> (phase3Intensity + 0.025F).coerceAtMost(bestPhase3)
+            phase3Intensity > bestPhase3 -> (phase3Intensity - 0.025F).coerceAtLeast(bestPhase3)
             else -> phase3Intensity
         }
     }
